@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AWAKENED</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --gold: #ffd700;
+      --red:  #ef4444;
+      --purple: #a78bfa;
+      --bg: #0a0a0f;
+    }
+
+    html, body {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    #gameWrapper {
+      position: relative;
+      width: min(700px, 100vw);
+      aspect-ratio: 700 / 420;
+      background: #000;
+      box-shadow: 0 0 60px rgba(167,139,250,0.25), 0 0 120px rgba(0,0,0,0.8);
+    }
+
+    canvas {
+      display: block;
+      width: 100%; height: 100%;
+      image-rendering: pixelated;
+    }
+
+    /* HUD overlay */
+    #hud {
+      position: absolute; top: 0; left: 0; right: 0;
+      padding: 10px 14px;
+      display: flex; justify-content: space-between; align-items: flex-start;
+      pointer-events: none;
+    }
+    #hud .left, #hud .right { display: flex; flex-direction: column; gap: 4px; }
+    #hud .stat {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      color: rgba(255,255,255,0.85);
+      background: rgba(0,0,0,0.5);
+      padding: 3px 9px;
+      border-radius: 3px;
+      border-left: 2px solid var(--gold);
+      letter-spacing: 1px;
+    }
+    #hud .stat span { color: var(--gold); }
+
+    /* Screens */
+    .screen {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.82);
+      backdrop-filter: blur(2px);
+    }
+    .screen.hidden { display: none; }
+
+    .screen-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(48px, 10vw, 80px);
+      letter-spacing: 10px;
+      color: #fff;
+      text-shadow: 0 0 30px rgba(167,139,250,0.6);
+      animation: pulse 3s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { text-shadow: 0 0 30px rgba(167,139,250,0.6); }
+      50%       { text-shadow: 0 0 60px rgba(167,139,250,1), 0 0 100px rgba(167,139,250,0.4); }
+    }
+
+    .screen-sub {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 3px;
+      margin-top: 8px;
+      margin-bottom: 32px;
+      text-transform: uppercase;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 24px;
+      margin-bottom: 28px;
+    }
+    .ctrl {
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      letter-spacing: 1px;
+    }
+    .ctrl b { color: var(--gold); font-weight: normal; }
+
+    .power-bar {
+      display: flex; gap: 6px; margin-bottom: 28px;
+    }
+    .power-pip {
+      width: 28px; height: 6px; border-radius: 3px;
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .power-pip.active { background: var(--gold); border-color: var(--gold); }
+
+    .cta {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      color: var(--gold);
+      letter-spacing: 4px;
+      animation: blink 1.2s step-end infinite;
+    }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    .highscore-line {
+      font-size: 11px;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 2px;
+      margin-top: 12px;
+    }
+    .highscore-line span { color: rgba(255,255,255,0.65); }
+
+    /* Death screen extras */
+    .death-score {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 42px;
+      color: var(--gold);
+      letter-spacing: 6px;
+      margin-bottom: 4px;
+    }
+    .death-label {
+      font-size: 11px; color: rgba(255,255,255,0.4);
+      letter-spacing: 3px; margin-bottom: 24px;
+    }
+    .new-best {
+      font-size: 12px; color: #4ade80;
+      letter-spacing: 3px; margin-bottom: 8px;
+      animation: pulse 1s ease-in-out infinite;
+    }
+
+    /* Unlock toast */
+    #toast {
+      position: absolute;
+      left: 50%; top: 38%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.75);
+      border: 1px solid var(--gold);
+      color: var(--gold);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 2px;
+      padding: 8px 20px;
+      border-radius: 4px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+
+    /* Mobile controls */
+    #mobileControls {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      display: none;
+      padding: 8px 12px;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+    @media (pointer: coarse) { #mobileControls { display: flex; } }
+    .dpad { display: grid; grid-template-columns: 36px 36px 36px; grid-template-rows: 36px 36px; gap: 3px; }
+    .mbtn {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 6px;
+      color: #fff; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; user-select: none; touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .mbtn:active { background: rgba(255,255,255,0.25); }
+    .mbtn.action { width: 44px; height: 44px; font-size: 13px; border-radius: 50%; background: rgba(167,139,250,0.2); border-color: var(--purple); }
+    .action-btns { display: flex; gap: 8px; align-items: flex-end; }
+  </style>
+</head>
+<body>
+<div id="gameWrapper">
+  <canvas id="c"></canvas>
+
+  <!-- HUD -->
+  <div id="hud">
+    <div class="left">
+      <div class="stat">SCORE <span id="scoreUI">0</span></div>
+      <div class="stat">POWER <span id="lvlUI">1</span></div>
+    </div>
+    <div class="right">
+      <div class="stat" id="biomeUI">SUNNY FIELDS</div>
+      <div class="stat" id="hpUI">HP ♥♥♥</div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <!-- Start Screen -->
+  <div class="screen" id="startScreen">
+    <div class="screen-title">AWAKENED</div>
+    <div class="screen-sub">You are nobody. Run. Survive. Become.</div>
+    <div class="controls-grid">
+      <div class="ctrl"><b>← → / A D</b> Move</div>
+      <div class="ctrl"><b>Space / W</b> Jump</div>
+      <div class="ctrl"><b>Shift</b> Dash (lv 3)</div>
+      <div class="ctrl"><b>Z / X</b> Attack (lv 2)</div>
+    </div>
+    <div class="power-bar" id="startPowerBar">
+      <div class="power-pip active"></div>
+      <div class="power-pip"></div>
+      <div class="power-pip"></div>
+      <div class="power-pip"></div>
+      <div class="power-pip"></div>
+    </div>
+    <div class="cta">PRESS SPACE TO BEGIN</div>
+    <div class="highscore-line" id="startHiScore"></div>
+  </div>
+
+  <!-- Death Screen -->
+  <div class="screen hidden" id="deathScreen">
+    <div class="screen-title" style="font-size: clamp(36px,8vw,60px); margin-bottom:4px;">YOU FELL</div>
+    <div class="death-label">SCORE</div>
+    <div class="death-score" id="deathScoreUI">0</div>
+    <div class="new-best hidden" id="newBestUI">NEW BEST!</div>
+    <div class="highscore-line" id="deathHiScore"></div>
+    <div style="height:20px"></div>
+    <div class="cta">PRESS SPACE TO TRY AGAIN</div>
+  </div>
+
+  <!-- Mobile Controls -->
+  <div id="mobileControls">
+    <div class="dpad">
+      <div></div>
+      <div class="mbtn" id="mUp">↑</div>
+      <div></div>
+      <div class="mbtn" id="mLeft">←</div>
+      <div class="mbtn" id="mDown">↓</div>
+      <div class="mbtn" id="mRight">→</div>
+    </div>
+    <div class="action-btns">
+      <div class="mbtn action" id="mDash">DSH</div>
+      <div class="mbtn action" id="mAtk">ATK</div>
+      <div class="mbtn action" id="mJump">JMP</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  CANVAS SETUP
+// ─────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const NATIVE_W = 700, NATIVE_H = 420;
+canvas.width = NATIVE_W; canvas.height = NATIVE_H;
+const W = NATIVE_W, H = NATIVE_H;
+
+// ─────────────────────────────────────────────
+//  BIOMES
+// ─────────────────────────────────────────────
+const BIOMES = [
+  { name:'SUNNY FIELDS',  sky:['#87CEEB','#c8eaf7'], ground:'#4a8c2a', accent:'#6db84a', cloud:'rgba(255,255,255,0.7)',   starAlpha:0,   lightLevel:1.0 },
+  { name:'NEON RUINS',    sky:['#0d0d1a','#1a0d2e'], ground:'#5b21b6', accent:'#8b5cf6', cloud:'rgba(139,92,246,0.25)',  starAlpha:0.8, lightLevel:0.6 },
+  { name:'DARK CAVERN',   sky:['#080808','#111'],    ground:'#1f2937', accent:'#4b5563', cloud:'rgba(100,100,100,0.15)', starAlpha:0,   lightLevel:0.35 },
+  { name:'STORMY SKIES',  sky:['#1e2a3a','#2d3f55'], ground:'#1d4ed8', accent:'#3b82f6', cloud:'rgba(100,140,200,0.35)',starAlpha:0.4, lightLevel:0.5 },
+  { name:'EMBER WASTES',  sky:['#3b0000','#7c1d1d'], ground:'#b91c1c', accent:'#f97316', cloud:'rgba(251,113,21,0.2)',  starAlpha:0.2, lightLevel:0.45 },
+];
+
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+let state = 'start';
+let score = 0, powerLevel = 1, scrollX = 0, frameCount = 0;
+let currentBiome = 0, invincibleTimer = 0;
+let unlockAlpha = 0, unlockText = '';
+let highScore = parseInt(localStorage.getItem('awakened_hs') || '0');
+
+// ─────────────────────────────────────────────
+//  PLAYER
+// ─────────────────────────────────────────────
+const PW = 22, PH = 30;
+let player = {};
+function resetPlayer() {
+  player = {
+    x:80, y:200, vx:0, vy:0, onGround:false, facing:1,
+    hp:3, maxHp:3,
+    doubleJump:false, usedDouble:false,
+    canDash:false, dashing:false, dashTimer:0, dashCooldown:0,
+    canWallClimb:false, wallContact:false,
+    canPunch:false, canShoot:false, canBurst:false,
+    attackTimer:0, attackCooldown:0, punchDir:1,
+    dead:false,
+  };
+}
+
+// ─────────────────────────────────────────────
+//  WORLD
+// ─────────────────────────────────────────────
+let platforms=[], enemies=[], projectiles=[], particles=[], coins=[];
+let platformEnd = 0;
+let stars = Array.from({length:80}, ()=>({ x:Math.random()*W, y:Math.random()*H*0.6, r:Math.random()*1.5+0.3, twinkle:Math.random()*Math.PI*2 }));
+
+function generatePlatforms(startX, count) {
+  const baseY = H - 60;
+  let lx = startX, ly = baseY;
+  for (let i = 0; i < count; i++) {
+    const w = 90 + Math.random()*130;
+    const gap = 55 + Math.random()*85;
+    const dy = (Math.random()-0.5)*85;
+    let y = Math.max(H*0.22, Math.min(baseY, ly+dy));
+    const moving = Math.random() < 0.18;
+    platforms.push({ x:lx, y, w, h:14, type: moving?'moving':'solid', vy:(Math.random()-0.5)*1.1, dir:1 });
+    if (Math.random() < 0.45) coins.push({ x:lx+w/2-6, y:y-26, collected:false });
+    const eChance = 0.3 + score/2500;
+    if (Math.random() < eChance) enemies.push(makeEnemy(lx+20, y-30));
+    lx += w+gap; ly = y;
+  }
+  return lx;
+}
+
+function makeEnemy(x, y) {
+  const tier = Math.floor(score/600);
+  return { x, y, w:20, h:22, vx:(Math.random()<0.5?-1:1)*(1+tier*0.2), vy:0, onGround:false,
+    hp:1+tier, maxHp:1+tier, dead:false, shootTimer: tier>=2 ? Math.floor(Math.random()*60)+40 : 999 };
+}
+
+function initWorld() {
+  platforms=[]; enemies=[]; projectiles=[]; particles=[]; coins=[];
+  scrollX=0; platformEnd=0; frameCount=0; invincibleTimer=0;
+  score=0; powerLevel=1; currentBiome=0; unlockAlpha=0;
+  platforms.push({ x:0, y:H-60, w:420, h:14, type:'solid' });
+  platformEnd = generatePlatforms(440, 22);
+  resetPlayer();
+  applyPower();
+}
+
+function applyPower() {
+  player.doubleJump   = powerLevel >= 2;
+  player.canDash      = powerLevel >= 3;
+  player.canWallClimb = powerLevel >= 4;
+  player.canPunch     = powerLevel >= 2;
+  player.canShoot     = powerLevel >= 3;
+  player.canBurst     = powerLevel >= 5;
+}
+
+// ─────────────────────────────────────────────
+//  INPUT
+// ─────────────────────────────────────────────
+const keys = {};
+const mobileKeys = {};
+document.addEventListener('keydown', e => {
+  if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  keys[e.code] = true;
+  if ((e.code==='Space'||e.code==='Enter') && (state==='start'||state==='dead')) startGame();
+});
+document.addEventListener('keyup', e => { keys[e.code]=false; });
+
+function bindMobileBtn(id, keyName) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('touchstart', e=>{ e.preventDefault(); mobileKeys[keyName]=true; }, {passive:false});
+  el.addEventListener('touchend',   e=>{ e.preventDefault(); mobileKeys[keyName]=false; }, {passive:false});
+  el.addEventListener('mousedown',  e=>{ mobileKeys[keyName]=true; });
+  el.addEventListener('mouseup',    e=>{ mobileKeys[keyName]=false; });
+}
+bindMobileBtn('mLeft','left'); bindMobileBtn('mRight','right');
+bindMobileBtn('mUp','up'); bindMobileBtn('mJump','up');
+bindMobileBtn('mAtk','atk'); bindMobileBtn('mDash','dash');
+
+document.getElementById('startScreen').addEventListener('click', ()=>{ if(state==='start') startGame(); });
+document.getElementById('deathScreen').addEventListener('click', ()=>{ if(state==='dead')  startGame(); });
+
+function isLeft()  { return keys['ArrowLeft']||keys['KeyA']||mobileKeys['left']; }
+function isRight() { return keys['ArrowRight']||keys['KeyD']||mobileKeys['right']; }
+function isUp()    { return keys['ArrowUp']||keys['KeyW']||keys['Space']||mobileKeys['up']; }
+function isDash()  { return keys['ShiftLeft']||keys['ShiftRight']||mobileKeys['dash']; }
+function isAtk()   { return keys['KeyZ']||keys['KeyX']||mobileKeys['atk']; }
+
+// ─────────────────────────────────────────────
+//  SCREENS
+// ─────────────────────────────────────────────
+function startGame() {
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('deathScreen').classList.add('hidden');
+  initWorld();
+  state = 'play';
+}
+
+function showDeath() {
+  state = 'dead';
+  const isNew = score > highScore;
+  if (isNew) { highScore = score; localStorage.setItem('awakened_hs', highScore); }
+  document.getElementById('deathScoreUI').textContent = score;
+  document.getElementById('newBestUI').classList.toggle('hidden', !isNew);
+  document.getElementById('deathHiScore').innerHTML = isNew ? '' : `BEST: <span>${highScore}</span>`;
+  document.getElementById('deathScreen').classList.remove('hidden');
+}
+
+function updateStartHiScore() {
+  const el = document.getElementById('startHiScore');
+  if (highScore > 0) el.innerHTML = `BEST: <span>${highScore}</span>`;
+}
+updateStartHiScore();
+
+// ─────────────────────────────────────────────
+//  UNLOCK TOAST
+// ─────────────────────────────────────────────
+let toastTimeout = null;
+function showToast(msg) {
+  unlockText = msg; unlockAlpha = 1;
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  if (toastTimeout) clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(()=>{ t.classList.remove('show'); unlockAlpha=0; }, 2400);
+}
+
+// ─────────────────────────────────────────────
+//  PHYSICS CONSTANTS
+// ─────────────────────────────────────────────
+const GRAVITY  = 0.55;
+const JUMP_V   = -11.8;
+const SPEED    = 3.8;
+
+// ─────────────────────────────────────────────
+//  UPDATE
+// ─────────────────────────────────────────────
+let prevUp=false, prevAtk=false;
+
+function update() {
+  if (state !== 'play') return;
+  frameCount++;
+
+  // biome shift
+  const nb = Math.min(BIOMES.length-1, Math.floor(score/700));
+  currentBiome = nb;
+
+  // power level
+  const np = Math.min(5, 1+Math.floor(score/350));
+  if (np > powerLevel) {
+    powerLevel = np; applyPower();
+    const msgs = ['','DOUBLE JUMP + PUNCH!','DASH + RANGED SHOTS!','WALL CLIMB UNLOCKED!','BURST ATTACK READY!'];
+    showToast(msgs[powerLevel-1]||'POWER UP!');
+  }
+
+  if (invincibleTimer>0) invincibleTimer--;
+
+  // moving platforms
+  platforms.forEach(p => {
+    if (p.type==='moving') {
+      p.y += p.vy*p.dir;
+      if (p.y<H*0.18||p.y>H-80) p.dir*=-1;
+    }
+  });
+
+  // ---- PLAYER INPUT ----
+  const left=isLeft(), right=isRight(), up=isUp(), dash=isDash(), atk=isAtk();
+
+  if (player.dashing) {
+    player.dashTimer--;
+    if (player.dashTimer<=0){ player.dashing=false; player.vx=0; }
+  } else {
+    player.vx = 0;
+    if (left)  { player.vx=-SPEED; player.facing=-1; }
+    if (right) { player.vx= SPEED; player.facing= 1; }
+    if (dash && player.canDash && player.dashCooldown<=0 && (left||right)) {
+      player.dashing=true; player.dashTimer=10;
+      player.vx=player.facing*SPEED*2.9; player.dashCooldown=48;
+      spawnParticles(player.x+PW/2, player.y+PH/2, '#a78bfa', 8);
+    }
+  }
+  if (player.dashCooldown>0) player.dashCooldown--;
+
+  // jump
+  const justUp = up && !prevUp;
+  if (justUp) {
+    if (player.onGround) {
+      player.vy=JUMP_V; player.onGround=false; player.usedDouble=false;
+      spawnParticles(player.x+PW/2, player.y+PH, '#fff', 4);
+    } else if (player.canWallClimb && player.wallContact) {
+      player.vy=JUMP_V; player.vx=player.facing*-SPEED*2.2;
+      spawnParticles(player.x+PW/2, player.y+PH/2, '#34d399', 6);
+    } else if (player.doubleJump && !player.usedDouble) {
+      player.vy=JUMP_V*0.82; player.usedDouble=true;
+      spawnParticles(player.x+PW/2, player.y+PH, '#60a5fa', 6);
+    }
+  }
+  prevUp = up;
+
+  // attack
+  const justAtk = atk && !prevAtk;
+  if (justAtk && player.attackCooldown<=0) {
+    if (player.canBurst) {
+      spawnBurst(); player.attackCooldown=38;
+    } else if (player.canShoot) {
+      projectiles.push({ x:player.x+(player.facing>0?PW:-4), y:player.y+PH/2-3, vx:player.facing*10, vy:0, life:32, owner:'player', r:5 });
+      player.attackCooldown=18;
+    } else if (player.canPunch) {
+      player.attackTimer=13; player.punchDir=player.facing; player.attackCooldown=24;
+      checkPunch();
+    }
+  }
+  prevAtk = atk;
+  if (player.attackTimer>0) player.attackTimer--;
+  if (player.attackCooldown>0) player.attackCooldown--;
+
+  // gravity & move
+  player.vy += GRAVITY;
+  player.x  += player.vx;
+  player.y  += player.vy;
+
+  // wall climb slow
+  player.wallContact = false;
+  player.onGround    = false;
+
+  // platform collision
+  platforms.forEach(p => {
+    const px = p.x - scrollX;
+    if (player.x+PW > px && player.x < px+p.w) {
+      if (player.vy>=0 && player.y+PH > p.y && player.y+PH < p.y+p.h+14) {
+        player.y=p.y-PH; player.vy=0; player.onGround=true; player.usedDouble=false;
+      }
+      if (player.canWallClimb && player.vy>0) {
+        if (Math.abs(player.x+PW-px)<7 || Math.abs(player.x-px-p.w)<7) {
+          player.wallContact=true; player.vy*=0.35;
+        }
+      }
+    }
+  });
+
+  // scroll
+  const sx = player.x - scrollX;
+  if (sx > W*0.58) scrollX += (sx-W*0.58)*0.16;
+  if (sx < W*0.28) scrollX -= (W*0.28-sx)*0.16;
+
+  // generate more world
+  while (platformEnd-scrollX < W*2.5) platformEnd = generatePlatforms(platformEnd+60, 10);
+
+  // cull old objects
+  platforms   = platforms.filter(p => p.x-scrollX > -500);
+  enemies     = enemies.filter(e => e.x-scrollX > -400);
+  coins       = coins.filter(c => c.x-scrollX > -400);
+  projectiles = projectiles.filter(p => p.life>0);
+
+  // enemies
+  enemies.forEach(e => {
+    if (e.dead) return;
+    e.vy += GRAVITY; e.x += e.vx; e.y += e.vy; e.onGround=false;
+    platforms.forEach(p => {
+      const px=p.x-scrollX;
+      if (e.x+e.w>px && e.x<px+p.w && e.vy>=0 && e.y+e.h>p.y && e.y+e.h<p.y+p.h+14) {
+        e.y=p.y-e.h; e.vy=0; e.onGround=true;
+      }
+    });
+    if (e.onGround) {
+      const ex=e.x-scrollX;
+      if (ex<-20||ex>W+20) e.vx*=-1;
+    }
+    // chase
+    const dx=(player.x-scrollX)-(e.x-scrollX);
+    if (Math.abs(dx)<220) { e.vx+=Math.sign(dx)*0.05; e.vx=Math.max(-2.8,Math.min(2.8,e.vx)); }
+    // enemy shoot
+    if (e.shootTimer <= 0) {
+      const edx = (player.x-scrollX)-(e.x-scrollX);
+      const edy = (player.y)-(e.y);
+      const dist = Math.sqrt(edx*edx+edy*edy);
+      if (dist < 250) {
+        projectiles.push({ x:e.x-scrollX+e.w/2, y:e.y+e.h/2, vx:edx/dist*4, vy:edy/dist*4, life:60, owner:'enemy', r:4 });
+        e.shootTimer = 70+Math.floor(Math.random()*40);
+      }
+    }
+    if (e.shootTimer > 0) e.shootTimer--;
+    // stomp
+    if (invincibleTimer<=0 && player.x+PW > e.x-scrollX+3 && player.x < e.x-scrollX+e.w-3) {
+      if (player.vy>0 && player.y+PH > e.y+4 && player.y+PH < e.y+e.h+12) {
+        e.hp--; player.vy=-8;
+        if (e.hp<=0) killEnemy(e); else spawnParticles(e.x-scrollX+e.w/2, e.y, '#f97316', 6);
+      } else if (player.y+PH > e.y+8 && player.y < e.y+e.h) {
+        hurtPlayer();
+      }
+    }
+  });
+
+  // player projectile vs enemies
+  projectiles.forEach(pr => {
+    if (pr.owner==='player') {
+      enemies.forEach(e => {
+        if (!e.dead && pr.x > e.x-scrollX && pr.x < e.x-scrollX+e.w && pr.y > e.y && pr.y < e.y+e.h) {
+          e.hp--; pr.life=0;
+          if (e.hp<=0) killEnemy(e); else spawnParticles(e.x-scrollX+e.w/2, e.y+e.h/2, '#fbbf24', 5);
+        }
+      });
+    } else if (pr.owner==='enemy') {
+      if (invincibleTimer<=0 && pr.x > player.x-scrollX && pr.x < player.x-scrollX+PW && pr.y > player.y && pr.y < player.y+PH) {
+        hurtPlayer(); pr.life=0;
+      }
+    }
+    pr.x += pr.vx; pr.y += pr.vy; pr.life--;
+  });
+
+  // coins
+  coins.forEach(c => {
+    if (!c.collected && player.x+PW > c.x-scrollX+3 && player.x < c.x-scrollX+13 && player.y+PH > c.y && player.y < c.y+14) {
+      c.collected=true; score+=10; spawnParticles(c.x-scrollX+6, c.y+7, '#ffd700', 6);
+    }
+  });
+
+  // passive score
+  if (frameCount%40===0) score++;
+
+  // update HUD
+  document.getElementById('scoreUI').textContent = score;
+  document.getElementById('lvlUI').textContent   = powerLevel;
+  document.getElementById('biomeUI').textContent = BIOMES[currentBiome].name;
+  const hearts = '♥'.repeat(player.hp) + '♡'.repeat(player.maxHp-player.hp);
+  document.getElementById('hpUI').textContent = 'HP ' + hearts;
+
+  // particles
+  particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.life--; p.alpha=p.life/p.maxLife; });
+  particles = particles.filter(p=>p.life>0);
+
+  // fall death
+  if (player.y > H+100) killPlayer();
+}
+
+function hurtPlayer() {
+  if (invincibleTimer>0) return;
+  player.hp--; invincibleTimer=90;
+  player.vy=-5;
+  spawnParticles(player.x+PW/2, player.y+PH/2, '#ef4444', 12);
+  if (player.hp<=0) killPlayer();
+}
+function killPlayer() { if (state!=='play') return; showDeath(); }
+function killEnemy(e) {
+  e.dead=true; score += 25+powerLevel*8;
+  spawnParticles(e.x-scrollX+e.w/2, e.y+e.h/2, '#fbbf24', 14);
+}
+function checkPunch() {
+  const px = player.x-scrollX+(player.punchDir>0?PW:-28);
+  enemies.forEach(e => {
+    if (!e.dead && e.x-scrollX+e.w>px && e.x-scrollX<px+28 && e.y<player.y+PH && e.y+e.h>player.y) {
+      e.hp--; if (e.hp<=0) killEnemy(e); else spawnParticles(e.x-scrollX+e.w/2, e.y+e.h/2,'#f97316',7);
+    }
+  });
+}
+function spawnBurst() {
+  for (let a=0;a<8;a++) {
+    const ang=(a/8)*Math.PI*2;
+    projectiles.push({ x:player.x-scrollX+PW/2, y:player.y+PH/2, vx:Math.cos(ang)*8, vy:Math.sin(ang)*8, life:24, owner:'player', r:5 });
+  }
+  spawnParticles(player.x-scrollX+PW/2, player.y+PH/2, '#fde68a', 20);
+}
+function spawnParticles(x,y,color,count) {
+  for (let i=0;i<count;i++) {
+    const a=Math.random()*Math.PI*2, s=1.5+Math.random()*3;
+    const life=16+Math.floor(Math.random()*16);
+    particles.push({ x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, color, life, maxLife:life, alpha:1 });
+  }
+}
+
+// ─────────────────────────────────────────────
+//  DRAW
+// ─────────────────────────────────────────────
+function drawBg(b) {
+  const g = ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0, b.sky[0]); g.addColorStop(1, b.sky[1]);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+
+  // stars
+  if (b.starAlpha > 0) {
+    ctx.save(); ctx.globalAlpha=b.starAlpha;
+    stars.forEach(s => {
+      const tw = (Math.sin(frameCount*0.04+s.twinkle)+1)/2;
+      ctx.globalAlpha = b.starAlpha * (0.4+tw*0.6);
+      ctx.fillStyle='#fff';
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2); ctx.fill();
+    });
+    ctx.restore();
+  }
+
+  // clouds / bg shapes (parallax)
+  ctx.save();
+  for (let i=0;i<5;i++) {
+    const bx = ((i*317 + frameCount*0.15) % (W+160)) - 80;
+    const by = 20 + (i*71)%(H*0.38);
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = b.cloud;
+    ctx.beginPath(); ctx.ellipse(bx, by, 55+(i*19)%60, 18+(i*11)%20, 0, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(bx+30, by-8, 35+(i*13)%30, 14+(i*7)%14, 0, 0, Math.PI*2); ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawPlatforms(b) {
+  platforms.forEach(p => {
+    const px=p.x-scrollX;
+    if (px+p.w<-10||px>W+10) return;
+    ctx.fillStyle=b.ground;
+    ctx.beginPath(); ctx.roundRect(px, p.y, p.w, p.h, 4); ctx.fill();
+    ctx.fillStyle=b.accent;
+    ctx.fillRect(px+3, p.y, p.w-6, 3);
+    // moving platform indicator
+    if (p.type==='moving') {
+      ctx.fillStyle='rgba(255,255,100,0.5)';
+      ctx.fillRect(px+p.w/2-6, p.y+4, 12, 4);
+    }
+  });
+}
+
+function drawEnemies(b) {
+  enemies.forEach(e => {
+    if (e.dead) return;
+    const ex=e.x-scrollX;
+    if (ex+e.w<-10||ex>W+10) return;
+    const ratio=e.hp/e.maxHp;
+    ctx.fillStyle=`hsl(${Math.round(ratio*110)},75%,42%)`;
+    ctx.beginPath(); ctx.roundRect(ex, e.y, e.w, e.h, 4); ctx.fill();
+    // eyes
+    ctx.fillStyle='#fff';
+    ctx.fillRect(ex+3,e.y+4,4,4); ctx.fillRect(ex+13,e.y+4,4,4);
+    ctx.fillStyle='#000';
+    ctx.fillRect(ex+4,e.y+5,2,2); ctx.fillRect(ex+14,e.y+5,2,2);
+    // hp bar
+    if (e.maxHp>1) {
+      ctx.fillStyle='rgba(0,0,0,0.4)'; ctx.fillRect(ex,e.y-6,e.w,3);
+      ctx.fillStyle=`hsl(${Math.round(ratio*110)},75%,55%)`; ctx.fillRect(ex,e.y-6,e.w*ratio,3);
+    }
+  });
+}
+
+function drawProjectiles() {
+  projectiles.forEach(pr => {
+    ctx.fillStyle = pr.owner==='player' ? (powerLevel>=5?'#fde68a':'#a78bfa') : '#ef4444';
+    ctx.beginPath(); ctx.arc(pr.x, pr.y, pr.r, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.beginPath(); ctx.arc(pr.x-pr.vx*0.3, pr.y-pr.vy*0.3, pr.r*0.5, 0, Math.PI*2); ctx.fill();
+  });
+}
+
+function drawCoins() {
+  coins.forEach(c => {
+    if (c.collected) return;
+    const cx=c.x-scrollX;
+    if (cx<-10||cx>W+10) return;
+    const bob=Math.sin(frameCount*0.08+c.x)*2;
+    ctx.fillStyle='#ffd700';
+    ctx.beginPath(); ctx.arc(cx+6, c.y+6+bob, 6, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='rgba(255,255,200,0.7)';
+    ctx.beginPath(); ctx.arc(cx+4, c.y+4+bob, 2, 0, Math.PI*2); ctx.fill();
+  });
+}
+
+function drawPlayer() {
+  if (invincibleTimer>0 && Math.floor(invincibleTimer/4)%2===0) return;
+  const px=player.x-scrollX;
+  const py=player.y;
+  const bodyColors=['#e2e8f0','#a78bfa','#60a5fa','#34d399','#fbbf24'];
+  const bodyCol=bodyColors[Math.min(powerLevel-1,4)];
+
+  ctx.save();
+  ctx.translate(px+PW/2, py+PH/2);
+  ctx.scale(player.facing, 1);
+
+  // dash trail
+  if (player.dashing) {
+    ctx.globalAlpha=0.25;
+    for (let t=1;t<=3;t++) {
+      ctx.fillStyle=bodyCol;
+      ctx.beginPath(); ctx.roundRect(-PW/2-t*8, -PH/2, PW, PH, 4); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // body glow aura at high power
+  if (powerLevel>=4) {
+    ctx.shadowBlur=18; ctx.shadowColor=bodyCol; ctx.globalAlpha=0.7;
+    ctx.fillStyle=bodyCol;
+    ctx.beginPath(); ctx.roundRect(-PW/2-2,-PH/2-2,PW+4,PH+4,6); ctx.fill();
+    ctx.shadowBlur=0; ctx.globalAlpha=1;
+  }
+
+  ctx.fillStyle=bodyCol;
+  ctx.beginPath(); ctx.roundRect(-PW/2,-PH/2,PW,PH,5); ctx.fill();
+
+  // face
+  ctx.fillStyle='#0f172a';
+  ctx.fillRect(3,-9,5,5);
+  // mouth: determined/neutral
+  ctx.fillRect(2,5,10,2);
+
+  // punch fist
+  if (player.attackTimer>0) {
+    ctx.fillStyle=bodyCol;
+    ctx.fillRect(PW/2,-5,12,8);
+    ctx.fillStyle='#fde68a';
+    ctx.fillRect(PW/2+10,-6,9,10);
+  }
+
+  ctx.restore();
+}
+
+function drawParticles() {
+  particles.forEach(p => {
+    ctx.globalAlpha=p.alpha; ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill();
+  });
+  ctx.globalAlpha=1;
+}
+
+function drawVignette(b) {
+  if (b.lightLevel >= 0.95) return;
+  const v=ctx.createRadialGradient(W/2,H/2,H*0.28, W/2,H/2,H*0.85);
+  const darkness = 1-b.lightLevel;
+  v.addColorStop(0,'rgba(0,0,0,0)');
+  v.addColorStop(1,`rgba(0,0,0,${darkness*0.75})`);
+  ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+}
+
+function draw() {
+  ctx.clearRect(0,0,W,H);
+  const b=BIOMES[currentBiome];
+  drawBg(b);
+  drawPlatforms(b);
+  drawCoins();
+  drawEnemies(b);
+  drawProjectiles();
+  drawPlayer();
+  drawParticles();
+  drawVignette(b);
+}
+
+// ─────────────────────────────────────────────
+//  LOOP
+// ─────────────────────────────────────────────
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>
