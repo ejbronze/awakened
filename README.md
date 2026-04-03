@@ -1,6 +1,6 @@
 # AWAKENED 🎮
 
-A side-scrolling platformer where you start as nobody and grow into power.
+A side-scrolling platformer where you start as nobody and grow into power. Run, jump, collect fruits, dodge monsters, and survive as long as you can.
 
 ## Play
 
@@ -17,6 +17,13 @@ Open `index.html` in any browser — no build step required.
 
 Mobile: on-screen buttons appear automatically on touch devices.
 
+## How to Score
+
+- **Survive** — score ticks up passively over time
+- **Collect fruits** — apples, bananas, strawberries, oranges (+15 each)
+- **Stomp enemies** — bounce on their heads to deal damage
+- **Kill enemies** — defeat them for big score bonuses
+
 ## Power Progression
 
 | Level | Score | Unlocks |
@@ -26,6 +33,14 @@ Mobile: on-screen buttons appear automatically on touch devices.
 | 3 | 700 | Dash + Ranged shot |
 | 4 | 1050 | Wall climb + wall jump |
 | 5 | 1400 | Burst attack (8-directional) |
+
+## Enemies
+
+Monsters patrol platforms and grow stronger as your score climbs:
+
+- **Tier 1** — basic patrollers that chase on sight
+- **Tier 2+** — start shooting projectiles at you
+- All monsters have horns, glowing eyes, and fangs — avoid or eliminate them
 
 ## Biomes
 
@@ -73,7 +88,11 @@ Your game will be live at `https://awakened-[hash].vercel.app`.
 
 ## Roadmap (post-MVP)
 
-- [ ] Sound effects & music (Web Audio API)
+- [x] Sound effects (Web Audio API — jump sounds)
+- [x] Idle character animation
+- [x] Fruit collectibles
+- [x] Monster enemy sprites with horns & fangs
+- [ ] Background music
 - [ ] Animated sprite sheets
 - [ ] Boss encounters every 5 biomes
 - [ ] Local co-op (2 players, same keyboard)
