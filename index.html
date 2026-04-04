@@ -132,9 +132,15 @@
 
     /* HP pips */
     #hpUI { display: flex; gap: 3px; align-items: center; flex-wrap: wrap; max-width: 160px; }
-    .hp-pip { font-size: 13px; line-height: 1; transition: color 0.15s; }
+    .hp-pip { font-size: 14px; line-height: 1; transition: color 0.2s, transform 0.2s; }
     .hp-pip.hp-full { color: #ef4444; text-shadow: 0 0 6px #ef4444; }
-    .hp-pip { color: rgba(255,255,255,0.2); }
+    .hp-pip.hp-lost { color: rgba(255,255,255,0.18); transform: scale(0.75); }
+    .hp-pip.hp-shake { animation: hpShake 0.3s ease; }
+    @keyframes hpShake {
+      0%   { transform: scale(1.4) rotate(-10deg); color:#fff; }
+      40%  { transform: scale(0.9) rotate(6deg); }
+      100% { transform: scale(0.75); }
+    }
 
     /* Pause screen */
     #pauseScreen { z-index: 10; }
@@ -208,6 +214,25 @@
     }
     #toast.show { opacity: 1; }
 
+    /* Tutorial popup */
+    #tutorial {
+      position: absolute; left: 50%; bottom: 54px;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.88);
+      border: 1px solid var(--purple);
+      border-radius: 6px;
+      padding: 10px 16px 12px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      min-width: 220px;
+      text-align: center;
+    }
+    #tutorial.show { opacity: 1; }
+    #tutorial .tut-title { color: var(--purple); font-size: 11px; letter-spacing: 3px; margin-bottom: 6px; }
+    #tutorial .tut-row { color: rgba(255,255,255,0.75); font-size: 11px; letter-spacing: 1px; margin: 2px 0; }
+    #tutorial .tut-row b { color: var(--gold); font-weight: normal; }
+
     /* Mobile controls */
     #mobileControls {
       position: absolute; bottom: 0; left: 0; right: 0;
@@ -250,6 +275,12 @@
 
   <!-- Toast -->
   <div id="toast"></div>
+
+  <!-- Tutorial popup -->
+  <div id="tutorial">
+    <div class="tut-title" id="tutTitle">NEW ABILITY</div>
+    <div id="tutBody"></div>
+  </div>
 
   <!-- Start Screen -->
   <div class="screen" id="startScreen">
@@ -340,7 +371,7 @@ const W = NATIVE_W, H = NATIVE_H;
 // ─────────────────────────────────────────────
 //  SERVER CONFIG (set URL to enable remote leaderboard)
 // ─────────────────────────────────────────────
-const SCORE_SERVER = ''; // e.g. 'http://localhost:3001'
+const SCORE_SERVER = 'http://localhost:3001';
 
 // ─────────────────────────────────────────────
 //  BIOMES
@@ -390,7 +421,7 @@ function resetPlayer() {
 // ─────────────────────────────────────────────
 //  WORLD
 // ─────────────────────────────────────────────
-let platforms=[], enemies=[], projectiles=[], particles=[], fruits=[], healthPacks=[];
+let platforms=[], enemies=[], projectiles=[], particles=[], fruits=[], healthPacks=[], heartPopups=[];
 const FRUIT_TYPES = ['apple','banana','strawberry','orange'];
 let platformEnd = 0;
 let stars = Array.from({length:80}, ()=>({ x:Math.random()*W, y:Math.random()*H*0.6, r:Math.random()*1.5+0.3, twinkle:Math.random()*Math.PI*2 }));
@@ -421,7 +452,7 @@ function makeEnemy(x, y) {
 }
 
 function initWorld() {
-  platforms=[]; enemies=[]; projectiles=[]; particles=[]; fruits=[]; healthPacks=[];
+  platforms=[]; enemies=[]; projectiles=[]; particles=[]; fruits=[]; healthPacks=[]; heartPopups=[];
   scrollX=0; platformEnd=0; frameCount=0; invincibleTimer=0;
   unlockAlpha=0; levelDoor=null; hiddenTrigger=null; levelTransition=0;
   currentBiome = inHiddenLevel ? 5 : Math.min(BIOMES.length-2, currentLevel-1);
@@ -455,6 +486,7 @@ function nextLevelOrHidden(dest) {
 
 function applyPower() {
   player.doubleJump   = true;           // from the very start
+  player.canWallJump  = true;           // wall jump always available
   player.canPunch     = powerLevel >= 2;
   player.canDash      = powerLevel >= 3;
   player.canShoot     = powerLevel >= 3;
@@ -509,6 +541,7 @@ function startGame() {
   currentLevel = 1; inHiddenLevel = false; score = 0; powerLevel = 1;
   initWorld();
   state = 'play';
+  setTimeout(()=>showTutorial(WALL_JUMP_TUT), 2200);
 }
 
 function pauseGame() {
@@ -601,6 +634,25 @@ function showToast(msg) {
   toastTimeout = setTimeout(()=>{ t.classList.remove('show'); unlockAlpha=0; }, 2400);
 }
 
+const TUTORIALS = {
+  2: { title:'PUNCH UNLOCKED', rows:['<b>Z / X</b> — Punch nearby enemies'] },
+  3: { title:'DASH + SHOOT UNLOCKED', rows:['<b>Shift + ← →</b> — Dash through enemies','<b>Z / X</b> — Fire ranged shot'] },
+  4: { title:'WALL CLIMB UNLOCKED', rows:['Press against a wall to slow your fall','<b>Space</b> while on wall — Wall jump'] },
+  5: { title:'BURST ATTACK UNLOCKED', rows:['<b>Z / X</b> — 8-direction energy burst','Destroys all nearby enemies at once!'] },
+};
+// Initial tutorial for wall jump (always available)
+const WALL_JUMP_TUT = { title:'WALL JUMP', rows:['Jump into a wall to grip it','Press <b>Space</b> again to leap off','<b>Space / W</b> — Double jump midair'] };
+
+let tutTimeout = null;
+function showTutorial(data) {
+  const el = document.getElementById('tutorial');
+  document.getElementById('tutTitle').textContent = data.title;
+  document.getElementById('tutBody').innerHTML = data.rows.map(r=>`<div class="tut-row">${r}</div>`).join('');
+  el.classList.add('show');
+  if (tutTimeout) clearTimeout(tutTimeout);
+  tutTimeout = setTimeout(()=>el.classList.remove('show'), 4500);
+}
+
 // ─────────────────────────────────────────────
 //  AUDIO
 // ─────────────────────────────────────────────
@@ -638,6 +690,39 @@ function playLevelCompleteSound() {
 function playSecretSound() {
   playNote(200, 80, 0.5, 'sawtooth', 0.07);
   setTimeout(()=>playNote(600,1200,0.4,'sine',0.10), 300);
+}
+
+function playBlehSound() {
+  // "bleh" — descending gurgle: high buzz drops to low thud
+  const t = audioCtx.currentTime;
+  const osc1 = audioCtx.createOscillator();
+  const osc2 = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc1.connect(gain); osc2.connect(gain); gain.connect(audioCtx.destination);
+  osc1.type = 'sawtooth';
+  osc1.frequency.setValueAtTime(320, t);
+  osc1.frequency.exponentialRampToValueAtTime(60, t + 0.18);
+  osc2.type = 'square';
+  osc2.frequency.setValueAtTime(180, t);
+  osc2.frequency.exponentialRampToValueAtTime(40, t + 0.22);
+  gain.gain.setValueAtTime(0.18, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+  osc1.start(t); osc1.stop(t + 0.25);
+  osc2.start(t); osc2.stop(t + 0.25);
+}
+
+function playHurtSound() {
+  // thud + short scream descend
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(600, t);
+  osc.frequency.exponentialRampToValueAtTime(80, t + 0.15);
+  gain.gain.setValueAtTime(0.22, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+  osc.start(t); osc.stop(t + 0.18);
 }
 
 // ─────────────────────────────────────────────
@@ -695,6 +780,7 @@ function update() {
     powerLevel = np; applyPower();
     const msgs = ['','PUNCH UNLOCKED!','DASH + RANGED SHOTS!','WALL CLIMB UNLOCKED!','BURST ATTACK READY!'];
     showToast(msgs[powerLevel-1]||'POWER UP!');
+    if (TUTORIALS[powerLevel]) showTutorial(TUTORIALS[powerLevel]);
   }
 
   if (invincibleTimer>0) invincibleTimer--;
@@ -732,9 +818,14 @@ function update() {
       player.vy=JUMP_V; player.onGround=false; player.usedDouble=false;
       spawnParticles(player.x + PW/2, player.y + PH/2, '#fff', 4);
       playJumpSound();
-    } else if (player.canWallClimb && player.wallContact) {
-      player.vy=JUMP_V; player.vx=player.facing*-SPEED*2.2;
-      spawnParticles(player.x + PW/2, player.y + PH/2, '#34d399', 6);
+    } else if (player.wallContact) {
+      // wall jump — kick off in the opposite direction of the wall
+      player.vy = JUMP_V * 0.92;
+      player.vx = player.wallContactDir * -SPEED * 2.5;
+      player.facing = player.wallContactDir * -1;
+      player.usedDouble = false;
+      player.wallContact = false;
+      spawnParticles(player.x + PW/2, player.y + PH/2, '#34d399', 7);
       playJumpSound();
     } else if (player.doubleJump && !player.usedDouble) {
       player.vy=JUMP_V*0.82; player.usedDouble=true;
@@ -766,26 +857,32 @@ function update() {
   let newX = player.x + player.vx;
   let newY = player.y + player.vy;
 
-  // wall climb slow
-  player.wallContact = false;
-  player.onGround    = false;
+  // wall / ceiling contact reset
+  player.wallContact     = false;
+  player.wallContactDir  = 0;
+  player.onGround        = false;
 
   // platform collision
   platforms.forEach(p => {
-    // horizontal
-    if (player.vx > 0 && newX + PW > p.x && player.x + PW <= p.x && newY + PH > p.y && newY < p.y + p.h) {
+    // horizontal — detect side contact for wall jump
+    if (player.vx >= 0 && newX + PW > p.x && player.x + PW <= p.x + 3 && newY + PH > p.y + 2 && newY < p.y + p.h - 2) {
       newX = p.x - PW; player.vx = 0;
-    } else if (player.vx < 0 && newX < p.x + p.w && player.x >= p.x + p.w && newY + PH > p.y && newY < p.y + p.h) {
+      player.wallContact = true; player.wallContactDir = 1;   // touching a right wall
+    } else if (player.vx <= 0 && newX < p.x + p.w && player.x >= p.x + p.w - 3 && newY + PH > p.y + 2 && newY < p.y + p.h - 2) {
       newX = p.x + p.w; player.vx = 0;
+      player.wallContact = true; player.wallContactDir = -1;  // touching a left wall
     }
-    // vertical
+    // ceiling (hitting underside while moving up)
+    if (player.vy < 0 && newY <= p.y + p.h && player.y >= p.y + p.h && newX + PW > p.x && newX < p.x + p.w) {
+      newY = p.y + p.h; player.vy = 0;
+    }
+    // floor (landing on top)
     if (player.vy >= 0 && newY + PH >= p.y && player.y + PH <= p.y + p.h && newX + PW > p.x && newX < p.x + p.w) {
       newY = p.y - PH; player.vy = 0; player.onGround = true; player.usedDouble = false;
     }
-    if (player.canWallClimb && player.vy > 0) {
-      if (Math.abs(newX + PW - p.x) < 7 || Math.abs(newX - (p.x + p.w)) < 7) {
-        player.wallContact = true; player.vy *= 0.35;
-      }
+    // wall climb slow (lv4+)
+    if (player.canWallClimb && player.wallContact && player.vy > 0) {
+      player.vy *= 0.35;
     }
   });
 
@@ -928,15 +1025,28 @@ function update() {
   particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.life--; p.alpha=p.life/p.maxLife; });
   particles = particles.filter(p=>p.life>0);
 
+  // heart popups
+  heartPopups.forEach(h => { h.y += h.vy; h.vy += 0.08; h.life--; });
+  heartPopups = heartPopups.filter(h=>h.life>0);
+
   // fall death
   if (player.y > H + 100) showDeath();
 }
 
+let prevHp = 6;
 function updateHPBar() {
   const bar = document.getElementById('hpUI');
+  const justLost = player.hp < prevHp;
+  const lostIdx = prevHp - 1; // pip index that just turned empty
+  prevHp = player.hp;
   let html = '';
   for (let i = 0; i < player.maxHp; i++) {
-    html += `<span class="hp-pip${i < player.hp ? ' hp-full' : ''}">♥</span>`;
+    if (i < player.hp) {
+      html += `<span class="hp-pip hp-full">♥</span>`;
+    } else {
+      const shake = justLost && i === lostIdx ? ' hp-shake' : '';
+      html += `<span class="hp-pip hp-lost${shake}">♥</span>`;
+    }
   }
   bar.innerHTML = html;
 }
@@ -945,13 +1055,18 @@ function hurtPlayer() {
   if (invincibleTimer>0) return;
   player.hp--; invincibleTimer=90;
   player.vy=-5;
+  playHurtSound();
   spawnParticles(player.x + PW/2, player.y + PH/2, '#ef4444', 12);
+  // animate a heart flying off
+  const lostIdx = player.hp; // index of pip that just became empty
+  heartPopups.push({ idx: lostIdx, x: player.x + PW/2, y: player.y, vy: -3, life: 40, maxLife: 40 });
   if (player.hp<=0) killPlayer();
 }
 function killPlayer() { showDeath(); }
 function killEnemy(e) {
   e.dead=true; score += 25+powerLevel*8;
   spawnParticles(e.x+e.w/2, e.y+e.h/2, '#fbbf24', 14);
+  playBlehSound();
 }
 function checkPunch() {
   const px = player.x + (player.punchDir > 0 ? PW : -28);
@@ -979,12 +1094,58 @@ function spawnParticles(x,y,color,count) {
 // ─────────────────────────────────────────────
 //  DRAW
 // ─────────────────────────────────────────────
+// Pre-generate background tree positions (world-space, scrolled at parallax)
+const BG_TREES = Array.from({length:28}, (_,i) => ({
+  wx: 80 + i * 290 + (i*137)%110,
+  h:  55 + (i*41)%55,
+  w:  18 + (i*17)%14,
+}));
+const FG_TREES = Array.from({length:18}, (_,i) => ({
+  wx: 40 + i * 420 + (i*97)%160,
+  h:  70 + (i*53)%60,
+  w:  22 + (i*19)%16,
+}));
+
+function drawTree(x, groundY, tw, th, col, dark) {
+  // trunk
+  ctx.fillStyle = dark ? '#3b1f0a' : '#5c2d0f';
+  ctx.fillRect(x - tw*0.18, groundY - th*0.28, tw*0.36, th*0.28);
+  // three triangle tiers
+  for (let t=0; t<3; t++) {
+    const scale = 1 - t*0.22;
+    const ty = groundY - th*0.25 - t*(th*0.26);
+    ctx.fillStyle = t===0 ? col : (t===1 ? (dark?'#1a3a1a':'#2d6a2d') : (dark?'#0f2a0f':'#1e4d1e'));
+    ctx.beginPath();
+    ctx.moveTo(x, ty - th*0.38*scale);
+    ctx.lineTo(x - tw*0.7*scale, ty);
+    ctx.lineTo(x + tw*0.7*scale, ty);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+function drawMountain(cx, baseY, mw, mh, col) {
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(cx - mw/2, baseY);
+  ctx.lineTo(cx, baseY - mh);
+  ctx.lineTo(cx + mw/2, baseY);
+  ctx.closePath(); ctx.fill();
+  // snow cap
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.beginPath();
+  ctx.moveTo(cx, baseY - mh);
+  ctx.lineTo(cx - mw*0.12, baseY - mh*0.78);
+  ctx.lineTo(cx + mw*0.12, baseY - mh*0.78);
+  ctx.closePath(); ctx.fill();
+}
+
 function drawBg(b) {
+  // sky gradient
   const g = ctx.createLinearGradient(0,0,0,H);
   g.addColorStop(0, b.sky[0]); g.addColorStop(1, b.sky[1]);
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 
-  // stars
+  // stars (night biomes)
   if (b.starAlpha > 0) {
     ctx.save(); ctx.globalAlpha=b.starAlpha;
     stars.forEach(s => {
@@ -996,17 +1157,75 @@ function drawBg(b) {
     ctx.restore();
   }
 
-  // clouds / bg shapes (parallax)
-  ctx.save();
-  for (let i=0;i<5;i++) {
-    const bx = ((i*317 + frameCount*0.15) % (W+160)) - 80;
-    const by = 20 + (i*71)%(H*0.38);
-    ctx.globalAlpha = 0.22;
-    ctx.fillStyle = b.cloud;
-    ctx.beginPath(); ctx.ellipse(bx, by, 55+(i*19)%60, 18+(i*11)%20, 0, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.ellipse(bx+30, by-8, 35+(i*13)%30, 14+(i*7)%14, 0, 0, Math.PI*2); ctx.fill();
+  const groundY = H - 46;
+
+  // ── BIOME 0: SUNNY FIELDS — dusty mountain backdrop ──
+  if (!inHiddenLevel && currentLevel === 1) {
+    // dust haze layer
+    const hazeG = ctx.createLinearGradient(0, H*0.55, 0, H);
+    hazeG.addColorStop(0, 'rgba(210,180,130,0)');
+    hazeG.addColorStop(1, 'rgba(210,180,130,0.28)');
+    ctx.fillStyle = hazeG; ctx.fillRect(0,0,W,H);
+
+    // distant mountains (deep parallax)
+    const mp = scrollX * 0.06;
+    ctx.save(); ctx.globalAlpha = 0.38;
+    drawMountain(140 - mp%W, groundY, 380, 210, '#b89a72');
+    drawMountain(390 - mp%W, groundY, 320, 175, '#c4a882');
+    drawMountain(640 - mp%W, groundY, 360, 195, '#b08060');
+    drawMountain((140 - mp%W) + W, groundY, 380, 210, '#b89a72');
+    drawMountain((390 - mp%W) + W, groundY, 320, 175, '#c4a882');
+    ctx.restore();
+
+    // mid mountains
+    const mp2 = scrollX * 0.14;
+    ctx.save(); ctx.globalAlpha = 0.6;
+    drawMountain(200 - mp2%W, groundY, 260, 155, '#8c6a3e');
+    drawMountain(500 - mp2%W, groundY, 300, 170, '#7a5a30');
+    drawMountain(780 - mp2%W, groundY, 240, 140, '#9a7248');
+    drawMountain((200 - mp2%W) + W, groundY, 260, 155, '#8c6a3e');
+    ctx.restore();
+
+    // BG trees (far, muted, heavy parallax)
+    const tp = scrollX * 0.22;
+    ctx.save(); ctx.globalAlpha = 0.55;
+    BG_TREES.forEach(t => {
+      const tx = ((t.wx - tp) % (W + 300) + W + 300) % (W + 300) - 150;
+      drawTree(tx, groundY, t.w, t.h, '#3d7a2a', true);
+    });
+    ctx.restore();
+
+    // FG trees (closer, richer, scroll faster)
+    const tp2 = scrollX * 0.55;
+    ctx.save(); ctx.globalAlpha = 0.82;
+    FG_TREES.forEach(t => {
+      const tx = ((t.wx - tp2) % (W + 400) + W + 400) % (W + 400) - 150;
+      drawTree(tx, groundY, t.w * 1.2, t.h * 1.1, '#4a9e32', false);
+    });
+    ctx.restore();
+
+    // dust particles drifting across
+    ctx.save(); ctx.globalAlpha = 0.12;
+    ctx.fillStyle = '#d4a55a';
+    for (let d=0; d<12; d++) {
+      const dx = ((d*213 + frameCount*0.4)%(W+80)) - 40;
+      const dy = H*0.55 + (d*41)%(H*0.3);
+      ctx.beginPath(); ctx.arc(dx, dy, 1.5+(d%3), 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
+  } else {
+    // other biomes: keep the original soft cloud parallax
+    ctx.save();
+    for (let i=0;i<5;i++) {
+      const bx = ((i*317 + frameCount*0.15) % (W+160)) - 80;
+      const by = 20 + (i*71)%(H*0.38);
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = b.cloud;
+      ctx.beginPath(); ctx.ellipse(bx, by, 55+(i*19)%60, 18+(i*11)%20, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(bx+30, by-8, 35+(i*13)%30, 14+(i*7)%14, 0, 0, Math.PI*2); ctx.fill();
+    }
+    ctx.restore();
   }
-  ctx.restore();
 }
 
 function drawPlatforms(b) {
@@ -1309,6 +1528,23 @@ function drawPlayer() {
   ctx.restore();
 }
 
+function drawHeartPopups() {
+  heartPopups.forEach(h => {
+    const alpha = h.life / h.maxLife;
+    const scale = 0.7 + (1 - alpha) * 0.6;
+    const sx = (h.x - scrollX);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(sx, h.y);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#ef4444';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('💔', 0, 0);
+    ctx.restore();
+  });
+}
+
 function drawParticles() {
   particles.forEach(p => {
     ctx.globalAlpha=p.alpha; ctx.fillStyle=p.color;
@@ -1338,6 +1574,7 @@ function draw() {
   drawEnemies(b);
   drawProjectiles();
   drawParticles();
+  drawHeartPopups();
   drawPlayer();
   drawVignette(b);
   drawLevelTransition();
