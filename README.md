@@ -92,8 +92,8 @@ Your game will be live at `https://awakened-[hash].vercel.app`.
 - [x] Idle character animation
 - [x] Fruit collectibles
 - [x] Monster enemy sprites with horns & fangs
-- [ ] Background music
-- [ ] Animated sprite sheets
-- [ ] Boss encounters every 5 biomes
-- [ ] Local co-op (2 players, same keyboard)
-- [ ] Level editor
+- [x] Background music (procedural per-level themes + secret area themes)
+- [x] Animated sprite sheets (walk cycle legs, jump squash/stretch, land squash, enemy waddle)
+- [x] Boss encounters — one boss per level, door locked until defeated, phase 2 enrage
+- [x] Local co-op — Tab to toggle, P2 uses IJKL + U/O keys, shared score & power
+- [x] Level editor — pause → Level Editor, drag platforms, place enemies/fruits, save/load per level
