@@ -568,7 +568,7 @@
 
   <!-- Death Screen -->
   <div class="screen hidden" id="deathScreen">
-    <div class="screen-title" style="font-size: clamp(36px,8vw,60px); margin-bottom:4px;">YOU FELL</div>
+    <div class="screen-title" style="font-size: clamp(36px,8vw,60px); margin-bottom:4px;">YOU LOST</div>
     <div class="death-label">SCORE</div>
     <div class="death-score" id="deathScoreUI">0</div>
     <div class="new-best hidden" id="newBestUI">NEW BEST!</div>
@@ -580,7 +580,7 @@
 
   <!-- Name Entry Screen -->
   <div class="screen hidden" id="nameScreen">
-    <div class="screen-title" style="font-size:clamp(32px,7vw,52px); margin-bottom:4px;">YOU FELL</div>
+    <div class="screen-title" style="font-size:clamp(32px,7vw,52px); margin-bottom:4px;">YOU LOST</div>
     <div class="name-label">YOUR SCORE</div>
     <div class="name-score" id="nameScoreUI">0</div>
     <div class="name-label" style="margin-top:16px;">ENTER YOUR NAME</div>
@@ -1579,7 +1579,7 @@ function submitScore() {
 function showDeathFinal() {
   const titleEl = document.querySelector('#deathScreen .screen-title');
   const ctaEl = document.querySelector('#deathScreen .cta');
-  if (titleEl) titleEl.textContent = 'YOU FELL';
+  if (titleEl) titleEl.textContent = 'YOU LOST';
   if (ctaEl) ctaEl.textContent = 'PRESS SPACE TO TRY AGAIN';
   const isNew = score > 0 && leaderboard.length > 0 && leaderboard[0].score === score;
   document.getElementById('deathScoreUI').textContent = score;
@@ -1616,6 +1616,8 @@ function showDeath() {
   if (isNewBest) { highScore = score; localStorage.setItem('awakened_hs', highScore); }
   if (isNewBest && score > 0) {
     // Only ask for name if they beat the high score
+    const nameTitleEl = document.querySelector('#nameScreen .screen-title');
+    if (nameTitleEl) nameTitleEl.textContent = 'YOU LOST';
     document.getElementById('nameScoreUI').textContent = score;
     document.getElementById('nameInput').value = '';
     document.getElementById('nameScreen').classList.remove('hidden');
@@ -1632,7 +1634,7 @@ function startWaterDeath() {
   player.vx = 0;
   player.vy = 0;
   player.onGround = false;
-  showToast('PULLED UNDER');
+  showToast('SINKING...');
 }
 
 function updateStartHiScore() {
@@ -2061,6 +2063,7 @@ function update() {
   // ---- PLAYER INPUT ----
   const left=isLeft(), right=isRight(), up=isUp(), dash=isDash(), atk=isAtk();
   const inWaterVoid = inHiddenLevel && hiddenFromLevel === 3;
+  const inLevelOneRiver = !inHiddenLevel && currentLevel === 1;
   if (inWaterVoid) {
     waveChaseX += 0.55;
     if (player.x < waveChaseX + 54) {
@@ -2506,7 +2509,7 @@ function update() {
 
   // fall death
   if (player.y > H + 32 && tryHelperVoidSave()) return;
-  if (inHiddenLevel && hiddenFromLevel === 3 && player.y > H - 8) {
+  if ((inWaterVoid || inLevelOneRiver) && player.y > H - 8) {
     startWaterDeath();
     return;
   }
