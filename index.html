@@ -733,6 +733,9 @@ let hiddenTrigger = null, inHiddenLevel = false, hiddenFromLevel = 1, savedState
 let hiddenExitSuccess = false;
 let hiddenTimer = 0, hiddenTimerMax = 0, hiddenLastTickSecond = -1;
 let levelGoals = null;
+let waterDeathTimer = 0;
+let waterDeathPending = false;
+let waveChaseX = -9999;
 let npcs = [];
 let leaderboard = JSON.parse(localStorage.getItem('awakened_lb') || '[]');
 const LEVEL_LENGTH = 3800;
@@ -848,7 +851,7 @@ function generatePlatforms(startX, count) {
     }
     const eChance = 0.3 + score/2500;
     if (Math.random() < eChance) enemies.push(makeEnemy(lx+20, y-30));
-    if (Math.random() < 0.12) enemies.push(makeFlowerEnemy(lx + w * 0.72, y - 40));
+    if (Math.random() < 0.12) addFlowerOnPlatform(platforms[platforms.length - 1], 0.72, Math.random() < 0.55);
     lx += w+gap; ly = y;
   }
   return lx;
@@ -864,8 +867,17 @@ function makeFlowerEnemy(x, y) {
   return {
     x, y, baseY:y, w:18, h:24, vx:0, vy:0, onGround:true,
     hp:2, maxHp:2, dead:false, shootTimer:50 + Math.floor(Math.random() * 40),
-    type:'flower', popTimer:0, exposed:true, stemH:16
+    type:'flower', popTimer:0, exposed:true, stemH:16, supportY:y + 24, shoots:true
   };
+}
+
+function addFlowerOnPlatform(platform, ratio=0.72, shoots=true) {
+  const fx = Math.round(platform.x + platform.w * ratio - 9);
+  const fy = Math.round(platform.y - 32);
+  const flower = makeFlowerEnemy(fx, fy);
+  flower.supportY = platform.y;
+  flower.shoots = shoots;
+  enemies.push(flower);
 }
 
 function seedItemBoxes() {
@@ -899,6 +911,7 @@ function initWorld() {
   platforms=[]; enemies=[]; projectiles=[]; particles=[]; fruits=[]; healthPacks=[]; heartPopups=[]; itemBoxes=[];
   scrollX=0; platformEnd=0; frameCount=0; invincibleTimer=0;
   unlockAlpha=0; levelDoor=null; hiddenTrigger=null; levelTransition=0;
+  waterDeathTimer = 0; waterDeathPending = false; waveChaseX = -9999;
   checkpoints = []; activeCheckpoint = null;
   hiddenTimer = inHiddenLevel ? (45 + hiddenFromLevel * 10) * 60 : 0;
   hiddenTimerMax = hiddenTimer;
@@ -957,6 +970,11 @@ function initWorld() {
     const bossPrep = { x:LEVEL_LENGTH - 430, y:H - 142, w:120, h:14, type:'solid', vy:0, dir:1, prepSpot:true };
     platforms.push(bossPrep);
     fruits.push({ x:bossPrep.x + bossPrep.w/2 - 7, y:bossPrep.y - 28, type:'power_orb', collected:false });
+  } else if (hiddenFromLevel === 3) {
+    waveChaseX = -120;
+    for (let i = 0; i < 6; i++) {
+      platforms.push({ x:680 + i * 260, y:H - 120 - (i % 2) * 58, w:90, h:12, type:'solid', vy:0, dir:1, waveRun:true });
+    }
   }
 
   // level exit door at LEVEL_LENGTH
@@ -1066,6 +1084,11 @@ function initLevelGoals() {
     enemy: { label:'Defeat enemies', current:0, target:enemyTarget, done:false, required:true },
     boss: { label: inHiddenLevel ? 'Find the return door' : 'Defeat the boss', current:0, target:1, done:false, required:!inHiddenLevel },
   };
+  if (inHiddenLevel && hiddenFromLevel === 3) {
+    levelGoals.checkpoint = { label:'Outrun the flood', current:0, target:1, done:false, required:true };
+    levelGoals.fruit = { label:'Grab 1 fruit on the run', current:0, target:1, done:false, required:true };
+    levelGoals.enemy = { label:'Reach the far platforms', current:0, target:1, done:false, required:true };
+  }
   updateMissionUI();
 }
 
@@ -1594,6 +1617,16 @@ function showDeath() {
   }
 }
 
+function startWaterDeath() {
+  if (waterDeathPending || state !== 'play') return;
+  waterDeathPending = true;
+  waterDeathTimer = 85;
+  player.vx = 0;
+  player.vy = 0;
+  player.onGround = false;
+  showToast('PULLED UNDER');
+}
+
 function updateStartHiScore() {
   const el = document.getElementById('startHiScore');
   if (highScore > 0) el.innerHTML = `BEST: <span>${highScore}</span>`;
@@ -1921,6 +1954,20 @@ function update() {
   if (state === 'paused') return;
   if (state === 'editor') { updateEditor(); return; }
   if (state !== 'play') return;
+  if (waterDeathPending) {
+    frameCount++;
+    waterDeathTimer--;
+    player.vy = Math.min(player.vy + 0.08, 1.4);
+    player.y += player.vy;
+    player.x += Math.sin(frameCount * 0.3) * 0.25;
+    if (waterDeathTimer % 8 === 0) spawnParticles(player.x + PW/2, player.y + PH/2, 'rgba(147,197,253,0.8)', 3);
+    if (waterDeathTimer <= 0) {
+      waterDeathPending = false;
+      if (!tryRespawnPlayer()) showDeath();
+    }
+    updateHPBar();
+    return;
+  }
 
   // level transition takes over during fade
   if (levelTransition > 0) {
@@ -2006,6 +2053,14 @@ function update() {
   // ---- PLAYER INPUT ----
   const left=isLeft(), right=isRight(), up=isUp(), dash=isDash(), atk=isAtk();
   const inWaterVoid = inHiddenLevel && hiddenFromLevel === 3;
+  if (inWaterVoid) {
+    waveChaseX += 0.55;
+    if (player.x < waveChaseX + 54) {
+      startWaterDeath();
+      return;
+    }
+    if (player.x > 1400) completeGoal('enemy');
+  }
 
   if (player.dashing) {
     player.dashTimer--;
@@ -2157,7 +2212,7 @@ function update() {
       e.popTimer = (e.popTimer + 1) % 150;
       e.exposed = e.popTimer > 24 && e.popTimer < 110;
       e.y = e.baseY + (e.exposed ? -12 : 8);
-      if (e.exposed && e.shootTimer <= 0) {
+      if (e.exposed && e.shoots && e.shootTimer <= 0) {
         const edx = (player.x + PW/2) - (e.x + e.w/2);
         const edy = (player.y + PH/2) - (e.y + e.h/2);
         const dist = Math.max(30, Math.hypot(edx, edy));
@@ -2200,7 +2255,7 @@ function update() {
     if (e.shootTimer > 0) e.shootTimer--;
     // stomp
     if (invincibleTimer<=0 && player.x + PW > e.x + 3 && player.x < e.x + e.w - 3) {
-      if (player.vy>0 && player.y+PH > e.y+4 && player.y+PH < e.y+e.h+12) {
+      if (player.vy>0 && player.y+PH > e.y+2 && player.y+PH < e.y+e.h+12) {
         e.hp--; player.vy=-8;
         if (e.hp<=0) killEnemy(e); else spawnParticles(e.x+e.w/2, e.y, '#f97316', 6);
       } else if (player.y+PH > e.y+8 && player.y < e.y+e.h) {
@@ -2356,7 +2411,7 @@ function update() {
       enemies.forEach(e => {
         if (e.dead) return;
         if (player2.x + PW > e.x + 3 && player2.x < e.x + e.w - 3) {
-          if (player2.vy > 0 && player2.y + PH > e.y + 4 && player2.y + PH < e.y + e.h + 12) {
+          if (player2.vy > 0 && player2.y + PH > e.y + 2 && player2.y + PH < e.y + e.h + 12) {
             e.hp--; player2.vy = -8;
             if (e.hp <= 0) killEnemy(e); else spawnParticles(e.x+e.w/2, e.y, '#f97316', 5);
           } else if (player2.y + PH > e.y + 8 && player2.y < e.y + e.h) {
@@ -2443,6 +2498,10 @@ function update() {
 
   // fall death
   if (player.y > H + 32 && tryHelperVoidSave()) return;
+  if (inHiddenLevel && hiddenFromLevel === 3 && player.y > H - 8) {
+    startWaterDeath();
+    return;
+  }
   if (player.y > H + 100 && !tryRespawnPlayer()) showDeath();
 }
 
@@ -3166,7 +3225,7 @@ function drawBg(b) {
     for(let y=0;y<H;y+=3){ctx.fillStyle='#000'; ctx.fillRect(0,y,W,1.5);} ctx.restore();
 
   } else if (key === 's3') {
-    // ── SUNKEN TEMPLE: deep blue underwater, columns, fish ──
+    // ── TIDAL RUINS: deep blue underwater, columns, fish, surge ──
     // caustic light ripples
     ctx.save();
     for(let c=0;c<8;c++){
@@ -3200,6 +3259,19 @@ function drawBg(b) {
     // bubble particles
     ctx.save(); ctx.globalAlpha=0.25; ctx.fillStyle='rgba(147,197,253,0.6)';
     for(let b2=0;b2<12;b2++){const bx=((b2*79+40)-(scrollX*0.15)%(W+80)+W+80)%(W+80)-40; const by=H-(((b2*33+frameCount*1.5)%H)); ctx.beginPath(); ctx.arc(bx,by,2,0,Math.PI*2); ctx.fill();} ctx.restore();
+    ctx.save();
+    ctx.fillStyle='rgba(59,130,246,0.18)';
+    ctx.fillRect(0, H*0.58, W, H*0.42);
+    if (waveChaseX > -900) {
+      const wx = waveChaseX - scrollX;
+      ctx.globalAlpha = 0.8;
+      ctx.fillStyle = 'rgba(125,211,252,0.55)';
+      ctx.beginPath();
+      ctx.moveTo(wx, H);
+      for (let y = 0; y <= H; y += 22) ctx.lineTo(wx + 18 + Math.sin(frameCount * 0.1 + y * 0.08) * 12, H - y);
+      ctx.lineTo(-40, 0); ctx.lineTo(-40, H); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
 
   } else if (key === 's4') {
     // ── CLOUD KINGDOM: fluffy clouds, rainbow, golden light ──
@@ -3480,23 +3552,30 @@ function drawEnemies(b) {
     if (e.type === 'flower') {
       const rise = e.exposed ? -10 : 6;
       ctx.save();
-      ctx.translate(ex + e.w/2, e.baseY + e.h/2 + rise);
+      ctx.translate(ex + e.w/2, e.supportY - 6);
       ctx.fillStyle = '#166534';
       ctx.fillRect(-2, 4, 4, e.stemH + 8);
       ctx.fillStyle = '#22c55e';
       ctx.beginPath(); ctx.ellipse(-6, 12, 5, 3, -0.6, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.ellipse(6, 10, 5, 3, 0.6, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#16a34a';
+      ctx.fillStyle = '#92400e';
       ctx.beginPath(); ctx.roundRect(-e.w/2-3, 10, e.w+6, 10, 4); ctx.fill();
       if (e.exposed) {
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath(); ctx.arc(0, -3, 10, 0, Math.PI*2); ctx.fill();
-        ctx.fillStyle = '#fef3c7';
-        ctx.beginPath(); ctx.arc(0, -3, 7, 0, Math.PI*2); ctx.fill();
+        ctx.translate(0, rise);
+        ctx.fillStyle = '#facc15';
+        for (let i = 0; i < 10; i++) {
+          const ang = (i / 10) * Math.PI * 2;
+          ctx.beginPath(); ctx.ellipse(Math.cos(ang) * 9, Math.sin(ang) * 9 - 3, 4, 2.6, ang, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = '#854d0e';
+        ctx.beginPath(); ctx.arc(0, -3, 8, 0, Math.PI*2); ctx.fill();
         ctx.fillStyle = '#0f172a';
         ctx.fillRect(-5, -5, 3, 3); ctx.fillRect(2, -5, 3, 3);
-        ctx.fillStyle = '#ef4444';
+        ctx.fillStyle = e.shoots ? '#ef4444' : '#fef3c7';
         ctx.fillRect(-4, 0, 8, 2);
+      } else {
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(-2, 7, 4, 2);
       }
       ctx.restore();
       return;
@@ -3640,9 +3719,16 @@ function drawPlayer() {
     if (player.vy < -5) { scX=0.84; scY=1.18; }
     else if (player.vy > 4) { scX=0.9; scY=1.10; }
   }
+  let sinkRot = 0;
+  if (waterDeathPending) {
+    scX = 0.92 + Math.sin(frameCount * 0.45) * 0.02;
+    scY = 1.06;
+    sinkRot = Math.sin(frameCount * 0.28) * 0.1;
+  }
 
   ctx.save();
   ctx.translate(px+PW/2, py+PH/2);
+  if (sinkRot) ctx.rotate(sinkRot);
   ctx.scale(player.facing * scX, scY);
 
   // dash trail
@@ -3692,7 +3778,7 @@ function drawPlayer() {
   }
 
   // face
-  const isIdle = player.onGround && player.vx === 0 && !player.dashing && !player.attackTimer;
+  const isIdle = !waterDeathPending && player.onGround && player.vx === 0 && !player.dashing && !player.attackTimer;
   if (isIdle) {
     const bob = Math.sin(frameCount * 0.06) * 1.5;
     ctx.save(); ctx.translate(0, Math.round(bob));
