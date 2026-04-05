@@ -50,7 +50,7 @@
 
     /* fullscreen toggle button */
     #fsBtn {
-      position: absolute; bottom: 8px; right: 8px;
+      position: absolute; top: 8px; right: 8px;
       background: rgba(0,0,0,0.55);
       border: 1px solid rgba(255,255,255,0.2);
       color: rgba(255,255,255,0.6);
@@ -342,24 +342,32 @@
     #mobileControls {
       position: absolute; bottom: 0; left: 0; right: 0;
       display: none;
-      padding: 8px 12px;
+      padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
       justify-content: space-between;
       align-items: flex-end;
     }
     @media (pointer: coarse) { #mobileControls { display: flex; } }
-    .dpad { display: grid; grid-template-columns: 36px 36px 36px; grid-template-rows: 36px 36px; gap: 3px; }
+    .dpad { display: grid; grid-template-columns: 52px 52px 52px; grid-template-rows: 52px 52px; gap: 6px; }
     .mbtn {
       background: rgba(255,255,255,0.12);
       border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 6px;
-      color: #fff; font-size: 16px;
+      border-radius: 10px;
+      color: #fff; font-size: 22px;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; user-select: none; touch-action: none;
       -webkit-tap-highlight-color: transparent;
+      min-width: 52px; min-height: 52px;
     }
     .mbtn:active { background: rgba(255,255,255,0.25); }
-    .mbtn.action { width: 44px; height: 44px; font-size: 13px; border-radius: 50%; background: rgba(167,139,250,0.2); border-color: var(--purple); }
-    .action-btns { display: flex; gap: 8px; align-items: flex-end; }
+    .mbtn.action { width: 62px; height: 62px; font-size: 16px; border-radius: 50%; background: rgba(167,139,250,0.2); border-color: var(--purple); }
+    .action-btns { display: flex; gap: 12px; align-items: flex-end; }
+    @media (pointer: coarse) and (max-width: 760px) {
+      #hud { padding-top: 44px; }
+      #mobileControls { padding-left: 14px; padding-right: 14px; }
+      .dpad { grid-template-columns: 58px 58px 58px; grid-template-rows: 58px 58px; gap: 7px; }
+      .mbtn { min-width: 58px; min-height: 58px; font-size: 24px; }
+      .mbtn.action { width: 70px; height: 70px; font-size: 17px; }
+    }
 
     /* Co-op indicator */
     #coopIndicator { font-size:11px; color:var(--purple); letter-spacing:3px; margin-top:-16px; margin-bottom:8px; display:none; }

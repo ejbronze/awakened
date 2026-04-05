@@ -27,7 +27,7 @@ Open `index.html` in any browser — no build step required.
 | `U` | Attack |
 | `O` | Dash |
 
-Mobile: on-screen buttons appear automatically on touch devices.
+Mobile: on-screen buttons appear automatically on touch devices. The touch controls are oversized for easier play, and the fullscreen toggle sits in the top-right so it does not overlap the jump area.
 
 ## How to Score
 
@@ -73,6 +73,7 @@ Hidden void stages can branch off from the main path. These secret levels are ti
 - **Character select with preview** — choose a hero before the run, with live preview art and appearance styles
 - **Distinct hero looks** — same core body shape, but each character has their own visual identity
 - **Accessible in-run menu** — persistent menu button, pause hub, restart flow, and character bay
+- **Mobile-friendly controls** — larger touch buttons and a safer fullscreen button position
 - **Local co-op** — second player joins with shared score and power progression
 - **Boss encounters** — one boss per main level, with door locks and a boss prep pickup before the fight
 - **Objectives and checkpoints** — fruit, enemy, checkpoint, and boss goals gate level exits
