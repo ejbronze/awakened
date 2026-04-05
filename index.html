@@ -596,7 +596,7 @@
     <button class="menu-btn" onclick="saveGame()">💾 SAVE GAME</button>
     <button class="menu-btn" onclick="loadSave()">📂 LOAD SAVE</button>
     <button class="menu-btn" onclick="toggleEditor()">✏ LEVEL EDITOR</button>
-    <button class="menu-btn danger" onclick="startGame()">✕ QUIT TO MENU</button>
+    <button class="menu-btn danger" onclick="quitToMenu()">✕ QUIT TO MENU</button>
     <div class="menu-section">
       <div class="menu-kicker">CHARACTER BAY</div>
       <div class="char-select" style="margin-top:0;">
@@ -1524,6 +1524,21 @@ function restartGame() {
   startGame();
 }
 
+function quitToMenu() {
+  stopMusic();
+  audioCtx.suspend();
+  state = 'start';
+  waterDeathPending = false;
+  waterDeathTimer = 0;
+  document.getElementById('pauseScreen').classList.add('hidden');
+  document.getElementById('deathScreen').classList.add('hidden');
+  document.getElementById('nameScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+  document.getElementById('menuHubBtn').classList.remove('show');
+  updateStartHiScore();
+  updateCharacterSelectUI();
+}
+
 function pauseGame() {
   state = 'paused';
   audioCtx.suspend();
@@ -2227,8 +2242,13 @@ function update() {
         const edx = (player.x + PW/2) - (e.x + e.w/2);
         const edy = (player.y + PH/2) - (e.y + e.h/2);
         const dist = Math.max(30, Math.hypot(edx, edy));
-        projectiles.push({ x:e.x + e.w/2, y:e.y + 8, vx:edx/dist*4.2, vy:edy/dist*4.2, life:75, owner:'enemy', r:4, kind:'fireball' });
-        e.shootTimer = 95;
+        const playerNotAbove = (player.y + PH/2) >= (e.y + 2);
+        if (playerNotAbove) {
+          projectiles.push({ x:e.x + e.w/2, y:e.y + 8, vx:edx/dist*4.2, vy:edy/dist*4.2, life:75, owner:'enemy', r:4, kind:'fireball' });
+          e.shootTimer = 95;
+        } else {
+          e.shootTimer = 18;
+        }
       }
     } else {
       e.vy += GRAVITY; e.x += e.vx; e.y += e.vy; e.onGround=false;
@@ -2258,9 +2278,12 @@ function update() {
       const edx = (player.x-scrollX)-(e.x-scrollX);
       const edy = (player.y)-(e.y);
       const dist = Math.sqrt(edx*edx+edy*edy);
-      if (dist < 250) {
+      const playerNotAbove = (player.y + PH/2) >= (e.y + 2);
+      if (dist < 250 && playerNotAbove) {
         projectiles.push({ x:e.x + e.w/2, y:e.y+e.h/2, vx:edx/dist*4, vy:edy/dist*4, life:60, owner:'enemy', r:4, kind:'fireball' });
         e.shootTimer = 70+Math.floor(Math.random()*40);
+      } else {
+        e.shootTimer = 18;
       }
     }
     if (e.shootTimer > 0) e.shootTimer--;
