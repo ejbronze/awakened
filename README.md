@@ -53,19 +53,20 @@ Monsters patrol platforms and grow stronger as your score climbs:
 
 - **Tier 1** — basic patrollers that chase on sight
 - **Tier 2+** — start shooting projectiles at you
+- **Flower enemies** — stationary pop-up hazards that spit fireballs like pipe flowers
 - All monsters have horns, glowing eyes, and fangs — avoid or eliminate them
 
 ## Biomes
 
-The world shifts darker as your score climbs:
+The world now shifts through more distinct scenes as your run advances:
 
-1. **Sunny Fields** — bright, forgiving, few enemies
-2. **Neon Ruins** — darker, faster enemies
-3. **Dark Cavern** — low light, tougher foes
-4. **Stormy Skies** — moving platforms, enemies shoot
+1. **Sunlit Riverlands** — bright outdoor stage with water and open space
+2. **Neon City** — darker urban skyline with glowing signage
+3. **Barrio Twilight** — warm hillside neighborhood feel with denser atmosphere
+4. **Euro Stormfront** — stormy rooftops and old-city silhouettes
 5. **Ember Wastes** — everything wants you dead
 
-Hidden void stages can branch off from the main path. These secret levels are timed, darker, and use their own soundtrack and pressure systems.
+Hidden void stages can branch off from the main path. These secret levels are timed, darker, and use their own soundtrack and pressure systems, including a water-themed void with heavier movement drag.
 
 ## Current Features
 
@@ -76,10 +77,12 @@ Hidden void stages can branch off from the main path. These secret levels are ti
 - **Boss encounters** — one boss per main level, with door locks and a boss prep pickup before the fight
 - **Objectives and checkpoints** — fruit, enemy, checkpoint, and boss goals gate level exits
 - **Hidden void routes** — timed secret stages with return doors, ticking pressure, and special pickups
+- **Persistent flight** — flying donuts now last until an enemy hit or fireball strips the wings away
 - **Helper bot** — unlockable ally that follows you later in the game and can rescue you from a fall on cooldown
 - **Special fruits** — flying donuts, speed donuts, and power orbs
 - **Question boxes** — pop boxes from below to release stronger fruit rewards in a more intentional way
 - **Jump-pad shaky platforms** — certain unstable platforms launch you upward when stepped on
+- **Clearer level exits** — completed stages now read like a shuttle boarding point instead of an unclear door
 - **Level editor** — build and save custom layouts from the pause menu
 
 ## Characters
@@ -141,3 +144,6 @@ Your game will be live at `https://awakened-[hash].vercel.app`.
 - [x] Secret void routes with timers, ticking ambience, and return exits
 - [x] Checkpoints, helper bot rescue, and objective-based level flow
 - [x] Question boxes for special fruit rewards
+- [x] Persistent donut flight with power-down hazards
+- [x] Stationary flower enemies with fireball attacks
+- [x] Stronger per-level world themes and clearer shuttle-style exits
