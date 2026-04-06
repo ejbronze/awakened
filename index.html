@@ -2083,10 +2083,16 @@ function startMusic() {
   audioCtx.resume();
   const T = getMusicTheme();
   const BPM_MS = Math.round(60000 / T.bpm);
+  const isVoidTheme = inHiddenLevel && hiddenTimer > 0;
+  const masterGain = isVoidTheme ? 0.28 : 0.2;
+  const bassGain = isVoidTheme ? 0.2 : 0.16;
+  const melGainStrong = isVoidTheme ? 0.11 : 0.08;
+  const melGainSoft = isVoidTheme ? 0.065 : 0.045;
+  const padGain = isVoidTheme ? 0.02 : 0.012;
 
   musicGain = audioCtx.createGain();
   musicGain.gain.setValueAtTime(0.0, audioCtx.currentTime);
-  musicGain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 1.8);
+  musicGain.gain.linearRampToValueAtTime(masterGain, audioCtx.currentTime + 1.8);
 
   musicFilter = audioCtx.createBiquadFilter();
   musicFilter.type = 'lowpass';
@@ -2112,10 +2118,27 @@ function startMusic() {
       const pad = audioCtx.createOscillator();
       const pg = audioCtx.createGain();
       pad.type = 'sine'; pad.frequency.value = freq * 0.5;
-      pg.gain.value = 0.012;
+      pg.gain.value = padGain;
       pad.connect(pg); pg.connect(musicGain); pad.start();
       musicNodes.push(pad, pg);
     });
+  }
+
+  if (isVoidTheme) {
+    const voidBed = audioCtx.createOscillator();
+    const voidBedGain = audioCtx.createGain();
+    voidBed.type = 'triangle';
+    voidBed.frequency.value = Math.max(28, T.droneFreq * 0.5);
+    voidBedGain.gain.value = 0.045;
+    voidBed.connect(voidBedGain); voidBedGain.connect(musicGain); voidBed.start();
+
+    const voidLfo = audioCtx.createOscillator();
+    const voidLfoGain = audioCtx.createGain();
+    voidLfo.type = 'sine';
+    voidLfo.frequency.value = 0.22;
+    voidLfoGain.gain.value = 8;
+    voidLfo.connect(voidLfoGain); voidLfoGain.connect(voidBed.frequency); voidLfo.start();
+    musicNodes.push(voidBed, voidBedGain, voidLfo, voidLfoGain);
   }
 
   musicBeat = 0; musicTick = 0;
@@ -2153,7 +2176,7 @@ function startMusic() {
     const b = audioCtx.createOscillator();
     const bg = audioCtx.createGain();
     b.type = 'triangle'; b.frequency.value = bassFreq;
-    bg.gain.setValueAtTime(0.16, t);
+    bg.gain.setValueAtTime(bassGain, t);
     bg.gain.exponentialRampToValueAtTime(0.001, t+0.42);
     b.connect(bg); bg.connect(musicGain);
     b.start(t); b.stop(t+0.44);
@@ -2168,7 +2191,7 @@ function startMusic() {
       mel.frequency.linearRampToValueAtTime(T.mel[musicBeat] + T.wobble, t + 0.06);
       mel.frequency.linearRampToValueAtTime(T.mel[musicBeat] - T.wobble * 0.5, t + 0.15);
     }
-    const melVol = (beat4===1||beat4===3) ? 0.08 : 0.045;
+    const melVol = (beat4===1||beat4===3) ? melGainStrong : melGainSoft;
     const melDur = T.bpm > 140 ? 0.30 : 0.55;
     mg2.gain.setValueAtTime(melVol, t+0.01);
     mg2.gain.exponentialRampToValueAtTime(0.001, t+melDur);
