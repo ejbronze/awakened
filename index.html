@@ -742,6 +742,7 @@ let hiddenExitSuccess = false;
 let hiddenTimer = 0, hiddenTimerMax = 0, hiddenLastTickSecond = -1;
 let hiddenPuzzle = null;
 let voidHelperUsed = false;
+let introTimer = 0;
 let levelGoals = null;
 let waterDeathTimer = 0;
 let waterDeathPending = false;
@@ -749,6 +750,7 @@ let waveChaseX = -9999;
 let npcs = [];
 let leaderboard = JSON.parse(localStorage.getItem('awakened_lb') || '[]');
 const LEVEL_LENGTH = 3800;
+const INTRO_DURATION = 5 * 60;
 
 // ── Co-op ──
 let coopMode = false;
@@ -797,6 +799,9 @@ let selectedStyleIdx = 0;
 let charStats = CHARACTERS[0];
 let charSpeedMult = 1.0;
 const isDeveloperBuild = ['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:';
+const ARCHITECT_CODE = 'pringles';
+let architectUnlocked = isDeveloperBuild || localStorage.getItem('awakened_architect_unlocked') === '1';
+let architectCodeBuffer = '';
 
 // ── Helper bot ──
 let helperUnlocked = false;
@@ -1329,6 +1334,7 @@ function getCurrentCharacterColors() {
 
 function cycleCharacter(dir) {
   const available = getSelectableCharacters();
+  if (!available.length) return;
   selectedCharIdx = (selectedCharIdx + dir + available.length) % available.length;
   charStats = available[selectedCharIdx];
   updateCharacterSelectUI();
@@ -1341,6 +1347,10 @@ function cycleCharacterStyle(dir) {
 
 function updateCharacterSelectUI() {
   const available = getSelectableCharacters();
+  if (!available.length) {
+    charStats = CHARACTERS.find(ch => ch.id === 'nobody') || CHARACTERS[0];
+    return;
+  }
   if (selectedCharIdx >= available.length) selectedCharIdx = 0;
   charStats = available[selectedCharIdx] || CHARACTERS[0];
   const colors = getCurrentCharacterColors();
@@ -1376,7 +1386,26 @@ function updateCharacterSelectUI() {
 }
 
 function getSelectableCharacters() {
-  return CHARACTERS.filter(ch => !ch.devOnly || isDeveloperBuild);
+  return CHARACTERS.filter(ch => ch.id !== 'architect' || architectUnlocked);
+}
+
+function unlockArchitect() {
+  if (architectUnlocked) return;
+  architectUnlocked = true;
+  localStorage.setItem('awakened_architect_unlocked', '1');
+  selectedCharIdx = getSelectableCharacters().findIndex(ch => ch.id === 'architect');
+  if (selectedCharIdx < 0) selectedCharIdx = 0;
+  showToast('ARCHITECT UNLOCKED');
+  updateCharacterSelectUI();
+}
+
+function handleArchitectCodeInput(key) {
+  if (!key || key.length !== 1) return;
+  architectCodeBuffer = (architectCodeBuffer + key.toLowerCase()).slice(-ARCHITECT_CODE.length);
+  if (architectCodeBuffer.endsWith(ARCHITECT_CODE)) {
+    architectCodeBuffer = '';
+    unlockArchitect();
+  }
 }
 
 function getCharacterLook(character=charStats) {
@@ -1636,6 +1665,12 @@ const mobileKeys = {};
 document.addEventListener('keydown', e => {
   if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
+  if (state === 'start' && !e.metaKey && !e.ctrlKey && !e.altKey) handleArchitectCodeInput(e.key);
+  if (state === 'intro' && ['Space','Enter','Escape','KeyZ','KeyX'].includes(e.code)) {
+    e.preventDefault();
+    trySkipWakeIntro();
+    return;
+  }
   if ((e.code==='Space'||e.code==='Enter') && (state==='start'||state==='dead')) startGame();
   if (e.code==='Tab') { e.preventDefault(); if (state==='start') toggleCoop(); }
   if (state === 'start') {
@@ -1685,12 +1720,43 @@ document.getElementById('menuHubBtn').addEventListener('click', () => {
   if (state === 'play') pauseGame();
   else if (state === 'paused') resumeGame();
 });
+wrapper.addEventListener('pointerdown', () => { if (state === 'intro') trySkipWakeIntro(); });
 
 function isLeft()  { return keys['ArrowLeft']||keys['KeyA']||mobileKeys['left']; }
 function isRight() { return keys['ArrowRight']||keys['KeyD']||mobileKeys['right']; }
 function isUp()    { return keys['ArrowUp']||keys['KeyW']||keys['Space']||mobileKeys['up']; }
 function isDash()  { return keys['ShiftLeft']||keys['ShiftRight']||mobileKeys['dash']; }
 function isAtk()   { return keys['KeyZ']||keys['KeyX']||mobileKeys['atk']; }
+
+function startWakeIntro() {
+  introTimer = 0;
+  state = 'intro';
+  stopMusic();
+  player.vx = 0;
+  player.vy = 0;
+  player.onGround = true;
+}
+
+function finishWakeIntro(skipped=false) {
+  if (state !== 'intro') return;
+  introTimer = 0;
+  player.x = 80;
+  player.y = H - 60 - PH;
+  player.vx = 0;
+  player.vy = 0;
+  player.onGround = true;
+  state = 'play';
+  document.getElementById('menuHubBtn').classList.add('show');
+  startMusic();
+  if (skipped) showToast('INTRO SKIPPED');
+  setTimeout(()=>showTutorial(WALL_JUMP_TUT), 2200);
+}
+
+function trySkipWakeIntro() {
+  if (state !== 'intro') return false;
+  finishWakeIntro(true);
+  return true;
+}
 
 // ─────────────────────────────────────────────
 //  SCREENS
@@ -1701,13 +1767,11 @@ function startGame() {
   document.getElementById('deathScreen').classList.add('hidden');
   document.getElementById('nameScreen').classList.add('hidden');
   document.getElementById('pauseScreen').classList.add('hidden');
-  document.getElementById('menuHubBtn').classList.add('show');
+  document.getElementById('menuHubBtn').classList.remove('show');
   currentLevel = 1; inHiddenLevel = false; score = 0; powerLevel = charStats.startPower || 1;
   helperUnlocked = false; helperBot = null;
   initWorld();
-  state = 'play';
-  startMusic();
-  setTimeout(()=>showTutorial(WALL_JUMP_TUT), 2200);
+  startWakeIntro();
 }
 
 function restartGame() {
@@ -2168,6 +2232,12 @@ let prevUp=false, prevAtk=false;
 function update() {
   if (state === 'paused') return;
   if (state === 'editor') { updateEditor(); return; }
+  if (state === 'intro') {
+    frameCount++;
+    introTimer++;
+    if (introTimer >= INTRO_DURATION) finishWakeIntro(false);
+    return;
+  }
   if (state !== 'play') return;
   if (waterDeathPending) {
     frameCount++;
@@ -3681,12 +3751,27 @@ function drawHiddenPuzzle() {
     ctx.translate(sx, sw.y);
     ctx.shadowBlur = solved ? 16 : (next ? 14 : 6);
     ctx.shadowColor = solved ? '#fde68a' : (next ? '#60a5fa' : `rgba(255,255,255,${0.2 + resetFlash * 0.5})`);
-    ctx.fillStyle = solved ? '#fde68a' : (next ? '#60a5fa' : '#334155');
-    ctx.beginPath(); ctx.arc(0, 0, sw.r - (next ? pulse * 1.4 : 0), 0, Math.PI * 2); ctx.fill();
+    const keyColor = solved ? '#fde68a' : (next ? '#60a5fa' : '#cbd5e1');
+    const bowColor = solved ? '#fef3c7' : (next ? '#bfdbfe' : '#475569');
+    const scale = 0.9 + (next ? pulse * 0.08 : 0);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = bowColor;
+    ctx.beginPath();
+    ctx.arc(-4, 0, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = keyColor;
+    ctx.beginPath();
+    ctx.arc(-4, 0, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = keyColor;
+    ctx.fillRect(0, -2, 14, 4);
+    ctx.fillRect(8, -2, 3, 7);
+    ctx.fillRect(12, -2, 3, 10);
     ctx.fillStyle = solved ? '#78350f' : '#e2e8f0';
-    ctx.font = 'bold 9px monospace';
+    ctx.font = 'bold 8px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText(sw.label, 0, 3);
+    ctx.fillText(sw.label, -4, 3);
     ctx.restore();
   });
 }
@@ -4229,6 +4314,112 @@ function drawVignette(b) {
   ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
 }
 
+function drawWakeIntroCutscene() {
+  const t = Math.min(1, introTimer / INTRO_DURATION);
+  const wakeStart = 0.38;
+  const shakeStart = 0.68;
+  const readyStart = 0.86;
+  const wakeT = Math.max(0, Math.min(1, (t - wakeStart) / (shakeStart - wakeStart)));
+  const shakeT = Math.max(0, Math.min(1, (t - shakeStart) / (readyStart - shakeStart)));
+  const readyT = Math.max(0, Math.min(1, (t - readyStart) / (1 - readyStart)));
+  const bodyColors = getCurrentCharacterColors();
+  const bodyCol = bodyColors[Math.min(powerLevel - 1, 4)];
+  const groundY = H - 60;
+  const baseX = player.x - scrollX + PW / 2 + 6;
+  const sleepBob = Math.sin(frameCount * 0.08) * 1.4;
+  const yawnOpen = Math.sin(Math.max(0, Math.min(1, wakeT)) * Math.PI);
+  const shake = shakeT > 0 ? Math.sin(frameCount * 0.9) * 3.2 * (1 - readyT * 0.5) : 0;
+  const angle = t < wakeStart
+    ? Math.PI / 2 - 0.12 + Math.sin(frameCount * 0.08) * 0.03
+    : (1 - wakeT) * (Math.PI / 2 - 0.12) + (shakeT > 0 ? Math.sin(frameCount * 1.1) * 0.06 : 0);
+  const bodyY = t < wakeStart
+    ? groundY - 8 + sleepBob
+    : groundY - 8 - wakeT * 18 + (shakeT > 0 ? Math.sin(frameCount * 0.85) * 1.8 : 0);
+  const scaleY = t < wakeStart ? 0.92 : 0.92 + wakeT * 0.1 + readyT * 0.02;
+  const scaleX = 1.06 - wakeT * 0.08 + shakeT * 0.04;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(2,6,23,0.22)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(15,23,42,0.25)';
+  ctx.beginPath();
+  ctx.ellipse(baseX + 6, groundY + 9, 42 - wakeT * 8, 10 + wakeT * 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.translate(baseX + shake, bodyY);
+  ctx.rotate(angle);
+  ctx.scale(scaleX, scaleY);
+  if (shakeT > 0) ctx.translate(Math.sin(frameCount * 1.6) * 1.5, Math.cos(frameCount * 1.2) * 0.8);
+
+  ctx.shadowBlur = 18;
+  ctx.shadowColor = 'rgba(255,255,255,0.14)';
+  ctx.fillStyle = bodyCol;
+  ctx.beginPath(); ctx.roundRect(-PW/2, -PH/2, PW, PH, 5); ctx.fill();
+  ctx.shadowBlur = 0;
+  drawCharacterAccessoriesLocal(ctx, charStats, bodyCol, false, false);
+
+  ctx.fillStyle = bodyCol;
+  ctx.beginPath(); ctx.roundRect(-PW/2+1, PH/2-2, 7, 5, 2); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(PW/2-8, PH/2-2, 7, 5, 2); ctx.fill();
+
+  ctx.fillStyle = '#fff';
+  if (t < wakeStart * 0.9) {
+    ctx.fillRect(-8, -10, 7, 2);
+    ctx.fillRect(1, -10, 7, 2);
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-4, 4, 8, 2);
+  } else {
+    ctx.fillRect(-8,-13,7,7);
+    ctx.fillRect(1,-13,7,7);
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-6,-11,3,4);
+    ctx.fillRect(4,-11,3,4);
+    if (wakeT > 0 && shakeT === 0) {
+      ctx.beginPath();
+      ctx.arc(0, 6, 2.8 + yawnOpen * 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(-6, 4, 12, 2);
+    }
+  }
+  ctx.restore();
+
+  if (t < wakeStart) {
+    const zBaseX = baseX + 28;
+    const zBaseY = groundY - 28 + Math.sin(frameCount * 0.12) * 3;
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('z', zBaseX, zBaseY);
+    ctx.fillText('z', zBaseX + 12, zBaseY - 10);
+    ctx.fillText('z', zBaseX + 22, zBaseY - 21);
+  } else if (wakeT > 0 && shakeT === 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.86)';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillText('YAWN', baseX + 28, groundY - 32 - yawnOpen * 8);
+  } else if (shakeT > 0) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const off = -10 + i * 10;
+      ctx.beginPath();
+      ctx.moveTo(baseX - 22 + off, groundY - 30);
+      ctx.lineTo(baseX - 28 + off, groundY - 40 - Math.sin(frameCount * 0.8 + i) * 5);
+      ctx.stroke();
+    }
+  }
+
+  const promptPulse = 0.55 + Math.sin(frameCount * 0.12) * 0.18;
+  ctx.fillStyle = 'rgba(15,23,42,0.38)';
+  ctx.fillRect(0, H - 38, W, 38);
+  ctx.fillStyle = `rgba(255,255,255,${promptPulse})`;
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('WAKING UP...', W / 2, H - 20);
+  ctx.font = '10px monospace';
+  ctx.fillText('PRESS SPACE, ENTER, Z, X OR TAP TO SKIP', W / 2, H - 8);
+  ctx.textAlign = 'left';
+}
+
 function draw() {
   ctx.clearRect(0,0,W,H);
   const b=BIOMES[currentBiome];
@@ -4247,7 +4438,8 @@ function draw() {
   if (helperUnlocked && helperBot) drawHelperBot();
   drawParticles();
   drawHeartPopups();
-  drawPlayer();
+  if (state === 'intro') drawWakeIntroCutscene();
+  else drawPlayer();
   if (coopMode && player2) drawPlayer2();
   drawVignette(b);
   drawLevelTransition();
