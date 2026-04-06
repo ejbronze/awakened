@@ -379,7 +379,7 @@
 
     /* Boss HP bar */
     #bossBar {
-      position:absolute; bottom:28px; left:50%; transform:translateX(-50%);
+      position:absolute; top:18px; left:50%; transform:translateX(-50%);
       width:clamp(200px, 50%, 380px); display:none; flex-direction:column; align-items:center;
       pointer-events:none;
     }
@@ -740,6 +740,8 @@ let doorLockToastTimer = 0;
 let hiddenTrigger = null, inHiddenLevel = false, hiddenFromLevel = 1, savedStateBeforeHidden = null;
 let hiddenExitSuccess = false;
 let hiddenTimer = 0, hiddenTimerMax = 0, hiddenLastTickSecond = -1;
+let hiddenPuzzle = null;
+let voidHelperUsed = false;
 let levelGoals = null;
 let waterDeathTimer = 0;
 let waterDeathPending = false;
@@ -781,6 +783,7 @@ const CHARACTERS = [
   { id:'knight',   name:'THE KNIGHT',   cls:'TANK',      desc:'+2 max HP. A slower but steadier pace.',        hpBonus:2,  speedMult:0.88, startPower:1, colors:['#bfdbfe','#60a5fa','#3b82f6','#1d4ed8','#93c5fd'] },
   { id:'speedster',name:'THE SPEEDSTER',cls:'SWIFT',     desc:'Blazing fast. Only 4 hearts. High risk.',       hpBonus:-2, speedMult:1.30, startPower:1, colors:['#bbf7d0','#4ade80','#22c55e','#16a34a','#fde68a'] },
   { id:'chosen',   name:'THE CHOSEN',   cls:'BERSERKER', desc:'Punch deals double. Burst fires 12 shots.',     hpBonus:0,  speedMult:1.00, startPower:1, isPunchy:true, colors:['#fef3c7','#fbbf24','#d97706','#b45309','#ef4444'] },
+  { id:'architect',name:'THE ARCHITECT',cls:'DEV ONLY',  desc:'Internal build. Starts with every awakened ability.', hpBonus:3, speedMult:1.12, startPower:5, isPunchy:true, devOnly:true, devAllAbilities:true, colors:['#ffffff','#93c5fd','#60a5fa','#fbbf24','#f97316'] },
 ];
 const CHARACTER_STYLES = [
   { id:'default', name:'Default', colors:null, dot:'#fde68a' },
@@ -793,6 +796,7 @@ let selectedCharIdx = 0;
 let selectedStyleIdx = 0;
 let charStats = CHARACTERS[0];
 let charSpeedMult = 1.0;
+const isDeveloperBuild = ['localhost', '127.0.0.1'].includes(location.hostname) || location.protocol === 'file:';
 
 // ── Helper bot ──
 let helperUnlocked = false;
@@ -829,6 +833,161 @@ const SPECIAL_FRUIT_TYPES = ['donut','speed_donut'];
 let platformEnd = 0;
 let stars = Array.from({length:80}, ()=>({ x:Math.random()*W, y:Math.random()*H*0.6, r:Math.random()*1.5+0.3, twinkle:Math.random()*Math.PI*2 }));
 
+function normalizePlatform(p) {
+  return {
+    baseY: p.baseY ?? p.y,
+    standTimer: p.standTimer ?? 0,
+    fallVy: p.fallVy ?? 0,
+    shakePhase: p.shakePhase ?? Math.random() * Math.PI * 2,
+    boostCooldown: p.boostCooldown ?? 0,
+    boostArmed: p.boostArmed ?? true,
+    sinkTriggered: p.sinkTriggered ?? false,
+    occupied: false,
+    ...p,
+  };
+}
+
+function makePlatform(x, y, w, h=14, type='solid', extra={}) {
+  return normalizePlatform({ x, y, w, h, type, vy:0, dir:1, ...extra });
+}
+
+function buildHiddenPuzzle(level) {
+  const puzzles = {
+    1: {
+      hint: 'Light the crystal seals in order',
+      switches: [
+        { x: 1160, y: H - 122, label:'I', style:'crystal' },
+        { x: 1518, y: H - 182, label:'II', style:'crystal' },
+        { x: 1686, y: 20, label:'III', style:'crystal' },
+      ],
+    },
+    2: {
+      hint: 'Trace the neon route from left to right',
+      switches: [
+        { x: -310, y: H - 112, label:'I', style:'crack' },
+        { x: 760, y: H - 176, label:'II', style:'crack' },
+        { x: 1420, y: H - 214, label:'III', style:'crack' },
+      ],
+    },
+    3: {
+      hint: 'Wake the buried runes in order',
+      switches: [
+        { x: 712, y: H - 118, label:'I', style:'rune' },
+        { x: 924, y: H - 118, label:'II', style:'rune' },
+        { x: 1210, y: H - 198, label:'III', style:'rune' },
+      ],
+    },
+    4: {
+      hint: 'Step through the cloud sigils in order',
+      switches: [
+        { x: 1710, y: H * 0.62 | 0, label:'I', style:'cloud' },
+        { x: 1968, y: H * 0.38 | 0, label:'II', style:'cloud' },
+        { x: 2098, y: 10, label:'III', style:'cloud' },
+      ],
+    },
+    5: {
+      hint: 'Cool the vents in order',
+      switches: [
+        { x: -468, y: H - 114, label:'I', style:'lava' },
+        { x: 1040, y: H - 164, label:'II', style:'lava' },
+        { x: 1770, y: H - 214, label:'III', style:'lava' },
+      ],
+    },
+  };
+  const def = puzzles[level];
+  if (!def) return null;
+  return {
+    solved:false,
+    progress:0,
+    hint:def.hint,
+    switches:def.switches.map(sw => ({ ...sw, r:16, active:false })),
+    resetFlash:0,
+  };
+}
+
+function activateHiddenPuzzleSwitch(actor) {
+  if (!hiddenPuzzle || hiddenPuzzle.solved || inHiddenLevel || !actor) return;
+  const nextSwitch = hiddenPuzzle.switches[hiddenPuzzle.progress];
+  if (!nextSwitch) return;
+  const hitNext =
+    actor.x + PW > nextSwitch.x - nextSwitch.r &&
+    actor.x < nextSwitch.x + nextSwitch.r &&
+    actor.y + PH > nextSwitch.y - nextSwitch.r &&
+    actor.y < nextSwitch.y + nextSwitch.r;
+
+  if (hitNext) {
+    nextSwitch.active = true;
+    hiddenPuzzle.progress++;
+    spawnParticles(nextSwitch.x, nextSwitch.y, '#fde68a', 14);
+    if (hiddenPuzzle.progress >= hiddenPuzzle.switches.length) {
+      hiddenPuzzle.solved = true;
+      showToast('SECRET GATE OPEN');
+      if (hiddenTrigger) hiddenTrigger.locked = false;
+    } else {
+      showToast('SIGIL ' + hiddenPuzzle.progress + ' / ' + hiddenPuzzle.switches.length);
+    }
+    return;
+  }
+
+  const touchedWrong = hiddenPuzzle.switches.some((sw, idx) =>
+    idx > hiddenPuzzle.progress &&
+    actor.x + PW > sw.x - sw.r &&
+    actor.x < sw.x + sw.r &&
+    actor.y + PH > sw.y - sw.r &&
+    actor.y < sw.y + sw.r
+  );
+  if (touchedWrong && hiddenPuzzle.progress > 0) {
+    hiddenPuzzle.switches.forEach(sw => sw.active = false);
+    hiddenPuzzle.progress = 0;
+    hiddenPuzzle.resetFlash = 18;
+    spawnParticles(actor.x + PW/2, actor.y + PH/2, '#ef4444', 12);
+    showToast('PUZZLE RESET');
+  }
+}
+
+function findBestRescuePlatform(actorX) {
+  const candidates = platforms
+    .filter(p => p.type !== 'moving')
+    .filter(p => p.y < H - 18)
+    .filter(p => p.w >= 60)
+    .sort((a, b) => {
+      const ad = Math.abs((a.x + a.w/2) - actorX) + Math.abs(a.y - (H - 120)) * 0.35;
+      const bd = Math.abs((b.x + b.w/2) - actorX) + Math.abs(b.y - (H - 120)) * 0.35;
+      return ad - bd;
+    });
+  return candidates[0] || null;
+}
+
+function isLevelTwoBoardReady() {
+  return currentLevel !== 1 || inHiddenLevel || score >= 1000;
+}
+
+function requestVoidHelper() {
+  if (!inHiddenLevel || !helperUnlocked || !helperBot) return false;
+  if (voidHelperUsed) {
+    showToast('VOID CALL ALREADY USED');
+    return false;
+  }
+  const plat = (activeCheckpoint && findRespawnPlatformAt(activeCheckpoint.x))
+    || findBestRescuePlatform(player.x + PW/2);
+  if (!plat) {
+    showToast('NO SAFE VOID LANDING');
+    return false;
+  }
+  voidHelperUsed = true;
+  helperBot.cooldown = HELPER_COOLDOWN;
+  helperBot.x = player.x + PW/2;
+  helperBot.y = player.y - 18;
+  player.x = Math.max(plat.x + 4, Math.min(plat.x + plat.w/2 - PW/2, plat.x + plat.w - PW - 4));
+  player.y = plat.y - PH;
+  player.vx = 0;
+  player.vy = -3;
+  invincibleTimer = 120;
+  spawnParticles(player.x + PW/2, player.y + PH/2, '#fde68a', 28);
+  showToast('ALLY VOID RECALL');
+  return true;
+}
+
 function generatePlatforms(startX, count) {
   const baseY = H - 60;
   let lx = startX, ly = baseY;
@@ -839,11 +998,13 @@ function generatePlatforms(startX, count) {
     let y = Math.max(H*0.22, Math.min(baseY, ly+dy));
     const moving = Math.random() < 0.18;
     const shaky = !moving && Math.random() < 0.10;
-    platforms.push({
-      x:lx, y, w, h:14, type: moving?'moving':(shaky?'shaky':'solid'),
+    const sinking = !moving && !shaky && Math.random() < 0.08;
+    platforms.push(normalizePlatform({
+      x:lx, y, w, h:14,
+      type: moving ? 'moving' : (shaky ? 'shaky' : (sinking ? 'sinking' : 'solid')),
       vy:(2.8 + Math.random()*1.8) * (Math.random()<0.5?1:-1), dir:1,
       standTimer:0, fallVy:0, shakePhase:Math.random()*Math.PI*2, boostCooldown:0
-    });
+    }));
     if (Math.random() < 0.55) {
       let type = FRUIT_TYPES[Math.floor(Math.random()*FRUIT_TYPES.length)];
       if (inHiddenLevel) {
@@ -868,7 +1029,7 @@ function generatePlatforms(startX, count) {
 function makeEnemy(x, y) {
   const tier = Math.floor(score/600);
   return { x, y, w:20, h:22, vx:(Math.random()<0.5?-1:1)*(1+tier*0.2), vy:0, onGround:false,
-    hp:1+tier, maxHp:1+tier, dead:false, shootTimer: tier>=2 ? Math.floor(Math.random()*60)+40 : 999, type:'walker' };
+    hp:1+tier, maxHp:1+tier, dead:false, shootTimer: tier>=2 ? Math.floor(Math.random()*60)+40 : 999, type:'walker', species:'roach' };
 }
 
 function makeFlowerEnemy(x, y) {
@@ -918,48 +1079,50 @@ function seedItemBoxes() {
 function initWorld() {
   platforms=[]; enemies=[]; projectiles=[]; particles=[]; fruits=[]; healthPacks=[]; heartPopups=[]; itemBoxes=[];
   scrollX=0; platformEnd=0; frameCount=0; invincibleTimer=0;
-  unlockAlpha=0; levelDoor=null; hiddenTrigger=null; levelTransition=0;
+  unlockAlpha=0; levelDoor=null; hiddenTrigger=null; hiddenPuzzle=null; levelTransition=0;
   waterDeathTimer = 0; waterDeathPending = false; waveChaseX = -9999;
   checkpoints = []; activeCheckpoint = null;
-  hiddenTimer = inHiddenLevel ? (45 + hiddenFromLevel * 10) * 60 : 0;
+  hiddenTimer = inHiddenLevel ? 120 * 60 : 0;
   hiddenTimerMax = hiddenTimer;
   hiddenLastTickSecond = hiddenTimer > 0 ? Math.ceil(hiddenTimer / 60) : -1;
+  voidHelperUsed = inHiddenLevel ? false : voidHelperUsed;
   currentBiome = inHiddenLevel ? (4 + hiddenFromLevel) : Math.min(4, currentLevel-1);
 
   // starting platform
-  platforms.push({ x:0, y:H-60, w:440, h:14, type:'solid', vy:0, dir:1 });
+  platforms.push(makePlatform(0, H-60, 440));
 
   // ── Per-level hidden secret triggers ──
   if (!inHiddenLevel) {
     if (currentLevel === 1) {
       // Lv1: Crystal ledge — staircase of 3 platforms makes it reachable
-      platforms.push({ x:1510, y:H-60-90,  w:90, h:12, type:'solid', vy:0, dir:1 }); // step 1
-      platforms.push({ x:1590, y:H-60-180, w:80, h:12, type:'solid', vy:0, dir:1 }); // step 2
-      platforms.push({ x:1640, y:48,       w:110,h:12, type:'solid', vy:0, dir:1 }); // top ledge
-      hiddenTrigger = { x:1660, y:18, w:70, h:40, active:true, style:'crystal' };
+      platforms.push(makePlatform(1510, H-60-90, 90, 12)); // step 1
+      platforms.push(makePlatform(1590, H-60-180, 80, 12)); // step 2
+      platforms.push(makePlatform(1640, 48, 110, 12)); // top ledge
+      hiddenTrigger = { x:1660, y:18, w:70, h:40, active:true, style:'crystal', locked:true };
 
     } else if (currentLevel === 2) {
       // Lv2: Cracked neon wall — go left from start
-      platforms.push({ x:-380, y:H-60, w:220, h:14, type:'solid', vy:0, dir:1 });
-      hiddenTrigger = { x:-280, y:H-60-55, w:34, h:55, active:true, style:'crack' };
+      platforms.push(makePlatform(-380, H-60, 220));
+      hiddenTrigger = { x:-280, y:H-60-55, w:34, h:55, active:true, style:'crack', locked:true };
 
     } else if (currentLevel === 3) {
       // Lv3: Rune on a special floor platform near x=900
-      platforms.push({ x:860, y:H-60, w:120, h:14, type:'solid', vy:0, dir:1 });
-      hiddenTrigger = { x:890, y:H-60-52, w:44, h:52, active:true, style:'rune' };
+      platforms.push(makePlatform(860, H-60, 120));
+      hiddenTrigger = { x:890, y:H-60-52, w:44, h:52, active:true, style:'rune', locked:true };
 
     } else if (currentLevel === 4) {
       // Lv4: Cloud — three-step staircase to reach it
-      platforms.push({ x:1870, y:H*0.58|0, w:85, h:12, type:'solid', vy:0, dir:1 }); // step 1
-      platforms.push({ x:1960, y:H*0.34|0, w:75, h:12, type:'solid', vy:0, dir:1 }); // step 2
-      platforms.push({ x:2060, y:30,        w:90, h:12, type:'solid', vy:0, dir:1 }); // cloud
-      hiddenTrigger = { x:2072, y:2, w:66, h:28, active:true, style:'cloud' };
+      platforms.push(makePlatform(1870, H*0.58|0, 85, 12)); // step 1
+      platforms.push(makePlatform(1960, H*0.34|0, 75, 12)); // step 2
+      platforms.push(makePlatform(2060, 30, 90, 12)); // cloud
+      hiddenTrigger = { x:2072, y:2, w:66, h:28, active:true, style:'cloud', locked:true };
 
     } else if (currentLevel === 5) {
       // Lv5: Lava crack — go left from start
-      platforms.push({ x:-520, y:H-60, w:200, h:14, type:'solid', vy:0, dir:1 });
-      hiddenTrigger = { x:-450, y:H-60-55, w:36, h:55, active:true, style:'lava' };
+      platforms.push(makePlatform(-520, H-60, 200));
+      hiddenTrigger = { x:-450, y:H-60-55, w:36, h:55, active:true, style:'lava', locked:true };
     }
+    hiddenPuzzle = buildHiddenPuzzle(currentLevel);
   }
 
   platformEnd = generatePlatforms(440, 22);
@@ -969,29 +1132,30 @@ function initWorld() {
     ? [{ x:1460, y:H-150 }]
     : [{ x:1260, y:H-112 }, { x:2840, y:H-136 }];
   checkpointSpots.forEach(spot => {
-    const plat = { x:spot.x, y:spot.y, w:110, h:14, type:'solid', vy:0, dir:1, checkpointSpot:true };
+    const plat = makePlatform(spot.x, spot.y, 110, 14, 'solid', { checkpointSpot:true });
     platforms.push(plat);
     checkpoints.push({ x:plat.x + plat.w/2 - 8, y:plat.y - 54, active:false });
   });
 
   if (!inHiddenLevel) {
-    const bossPrep = { x:LEVEL_LENGTH - 430, y:H - 142, w:120, h:14, type:'solid', vy:0, dir:1, prepSpot:true };
+    const bossPrep = makePlatform(LEVEL_LENGTH - 540, H - 142, 120, 14, 'solid', { prepSpot:true });
     platforms.push(bossPrep);
     fruits.push({ x:bossPrep.x + bossPrep.w/2 - 7, y:bossPrep.y - 28, type:'power_orb', collected:false });
   } else if (hiddenFromLevel === 3) {
     waveChaseX = -120;
     for (let i = 0; i < 6; i++) {
-      platforms.push({ x:680 + i * 260, y:H - 120 - (i % 2) * 58, w:90, h:12, type:'solid', vy:0, dir:1, waveRun:true });
+      platforms.push(makePlatform(680 + i * 260, H - 120 - (i % 2) * 58, 90, 12, 'solid', { waveRun:true }));
     }
   }
 
   // level exit door at LEVEL_LENGTH
   const doorBaseY = H - 60;
-  const exitPlatform = { x:LEVEL_LENGTH-20, y:doorBaseY, w:90, h:14, type:'solid', vy:0, dir:1 };
+  const exitPlatform = makePlatform(LEVEL_LENGTH-20, doorBaseY, 90);
   platforms.push(exitPlatform);
-  levelDoor = { x:exitPlatform.x + exitPlatform.w/2 - 18, y:exitPlatform.y - 68, w:36, h:68, active:true };
+  levelDoor = { x:exitPlatform.x + exitPlatform.w/2 - 18, y:exitPlatform.y - 68, w:36, h:68, active:!(currentLevel === 1 && !inHiddenLevel && score < 1000) };
 
   platformEnd = Math.max(platformEnd, LEVEL_LENGTH + 200);
+  platforms = platforms.map(normalizePlatform);
   seedItemBoxes();
 
   resetPlayer();
@@ -1008,6 +1172,17 @@ function nextLevelOrHidden(dest) {
 }
 
 function applyPower() {
+  if (charStats?.devAllAbilities) {
+    powerLevel = 5;
+    player.doubleJump = true;
+    player.canWallJump = true;
+    player.canPunch = true;
+    player.canDash = true;
+    player.canShoot = true;
+    player.canWallClimb = true;
+    player.canBurst = true;
+    return;
+  }
   player.doubleJump   = true;           // from the very start
   player.canWallJump  = true;           // wall jump always available
   player.canPunch     = powerLevel >= 2;
@@ -1020,12 +1195,18 @@ function applyPower() {
 function stripFlightAndPower(target='p1', cause='enemy') {
   const actor = target === 'p2' ? player2 : player;
   if (!actor) return;
+  if (charStats?.devAllAbilities) {
+    actor.flyTimer = actor.flyTimer === 0 ? 0 : actor.flyTimer;
+    spawnParticles(actor.x + PW/2, actor.y + PH/2, '#60a5fa', 10);
+    showToast('DEV SHIELD');
+    return;
+  }
   const hadFlight = actor.flyTimer !== 0;
   actor.flyTimer = 0;
   if (powerLevel > 1) {
     powerLevel--;
     applyPower();
-    showToast(cause === 'fireball' ? 'FIREBALL HIT! POWER DOWN' : 'KOOPA HIT! POWER DOWN');
+    showToast(cause === 'fireball' ? 'FIREBALL HIT! POWER DOWN' : 'ROACH HIT! POWER DOWN');
   } else if (hadFlight) {
     showToast(cause === 'fireball' ? 'FIREBALL BURNED YOUR WINGS' : 'WINGS LOST');
   }
@@ -1089,7 +1270,7 @@ function initLevelGoals() {
   levelGoals = {
     checkpoint: { label:'Reach a checkpoint', current:0, target:1, done:false, required:true },
     fruit: { label:'Collect fruit', current:0, target:fruitTarget, done:false, required:true },
-    enemy: { label:'Defeat enemies', current:0, target:enemyTarget, done:false, required:true },
+    enemy: { label:'Defeat roaches', current:0, target:enemyTarget, done:false, required:true },
     boss: { label: inHiddenLevel ? 'Find the return door' : 'Defeat the boss', current:0, target:1, done:false, required:!inHiddenLevel },
   };
   if (inHiddenLevel && hiddenFromLevel === 3) {
@@ -1133,7 +1314,8 @@ function updateMissionUI() {
 }
 
 function applyCharacterLoadout(fullHeal=false) {
-  charStats = CHARACTERS[selectedCharIdx] || CHARACTERS[0];
+  const available = getSelectableCharacters();
+  charStats = available[selectedCharIdx] || available[0] || CHARACTERS[0];
   charSpeedMult = charStats.speedMult || 1;
   const nextMax = Math.max(3, 6 + (charStats.hpBonus || 0));
   player.maxHp = nextMax;
@@ -1146,8 +1328,9 @@ function getCurrentCharacterColors() {
 }
 
 function cycleCharacter(dir) {
-  selectedCharIdx = (selectedCharIdx + dir + CHARACTERS.length) % CHARACTERS.length;
-  charStats = CHARACTERS[selectedCharIdx];
+  const available = getSelectableCharacters();
+  selectedCharIdx = (selectedCharIdx + dir + available.length) % available.length;
+  charStats = available[selectedCharIdx];
   updateCharacterSelectUI();
 }
 
@@ -1157,7 +1340,9 @@ function cycleCharacterStyle(dir) {
 }
 
 function updateCharacterSelectUI() {
-  charStats = CHARACTERS[selectedCharIdx];
+  const available = getSelectableCharacters();
+  if (selectedCharIdx >= available.length) selectedCharIdx = 0;
+  charStats = available[selectedCharIdx] || CHARACTERS[0];
   const colors = getCurrentCharacterColors();
   const statsText = `HP ${Math.max(3, 6 + (charStats.hpBonus || 0))} • SPD ${(charStats.speedMult || 1).toFixed(2)}x • START POWER ${charStats.startPower || 1}`;
   const paletteHtml = colors.map(c => `<span style="background:${c}"></span>`).join('');
@@ -1188,6 +1373,10 @@ function updateCharacterSelectUI() {
   });
   drawCharacterPreview('charPreview');
   drawCharacterPreview('pauseCharPreview');
+}
+
+function getSelectableCharacters() {
+  return CHARACTERS.filter(ch => !ch.devOnly || isDeveloperBuild);
 }
 
 function getCharacterLook(character=charStats) {
@@ -1360,7 +1549,7 @@ function initBoss() {
   const d = BOSS_DEFS[currentLevel - 1] || BOSS_DEFS[4];
   boss = {
     ...d, hp: d.maxHp,
-    x: LEVEL_LENGTH - 110, y: H - 60 - d.h,
+    x: LEVEL_LENGTH - 320, y: H - 60 - d.h,
     vx: -d.baseSpeed, vy: 0,
     onGround: false, activated: false, dead: false,
     atkTimer: d.atkRate, phase2: false,
@@ -1411,7 +1600,7 @@ function loadEditorLevel() {
   const raw = localStorage.getItem(key);
   if (!raw) { showToast('NO SAVED LAYOUT'); return; }
   const data = JSON.parse(raw);
-  platforms = data.platforms.map(p => ({ ...p, vy:0, dir:1 }));
+  platforms = data.platforms.map(p => normalizePlatform({ ...p, vy:0, dir:1 }));
   enemies   = data.enemies.map(e => makeEnemy(e.x, e.y));
   fruits    = data.fruits.map(f => ({ ...f, collected:false }));
   showToast('LAYOUT LOADED!');
@@ -1455,6 +1644,7 @@ document.addEventListener('keydown', e => {
     if (e.code === 'ArrowUp') cycleCharacterStyle(1);
     if (e.code === 'ArrowDown') cycleCharacterStyle(-1);
   }
+  if (e.code === 'KeyH' && !e.repeat && state === 'play' && inHiddenLevel) requestVoidHelper();
   if (e.code==='Escape' && state==='editor') toggleEditor();
   else if (e.code==='Escape' && state==='play') pauseGame();
   else if (e.code==='Escape' && state==='paused') resumeGame();
@@ -2052,6 +2242,19 @@ function update() {
   // biome stays fixed to level
   currentBiome = inHiddenLevel ? (4 + hiddenFromLevel) : Math.min(4, currentLevel-1);
 
+  if (!inHiddenLevel && currentLevel === 1 && score >= 1000 && levelDoor && !levelDoor.active) {
+    levelDoor.active = true;
+    if (boss && !boss.dead) {
+      boss.x = Math.min(levelDoor.x - 260, LEVEL_LENGTH - 340);
+      boss.y = H - 60 - boss.h;
+      boss.vx = -Math.abs(boss.baseSpeed);
+      boss.activated = true;
+      showToast('⚔ BOSS AMBUSH! BOARD OPENED');
+    } else {
+      showToast('BOARD TO LEVEL 2 READY');
+    }
+  }
+
   // power level
   const np = Math.min(5, 1+Math.floor(score/350));
   if (np > powerLevel) {
@@ -2065,6 +2268,7 @@ function update() {
 
   // moving platforms
   platforms.forEach(p => {
+    p.occupied = false;
     if (p.boostCooldown > 0) p.boostCooldown--;
     if (p.type==='moving') {
       p.y += p.vy*p.dir;
@@ -2074,6 +2278,7 @@ function update() {
     }
   });
   itemBoxes.forEach(box => { if (box.bumpTimer > 0) box.bumpTimer--; });
+  if (hiddenPuzzle && hiddenPuzzle.resetFlash > 0) hiddenPuzzle.resetFlash--;
 
   // ---- PLAYER INPUT ----
   const left=isLeft(), right=isRight(), up=isUp(), dash=isDash(), atk=isAtk();
@@ -2175,12 +2380,14 @@ function update() {
     // floor (landing on top)
     if (player.vy >= 0 && newY + PH >= p.y && player.y + PH <= p.y + p.h && newX + PW > p.x && newX < p.x + p.w) {
       newY = p.y - PH; player.vy = 0; player.onGround = true; player.usedDouble = false;
+      p.occupied = true;
       if (p.type === 'shaky' && !p.falling) {
         p.standTimer = (p.standTimer || 0) + 1;
-        if ((p.boostCooldown || 0) <= 0) {
+        if (p.boostArmed !== false && (p.boostCooldown || 0) <= 0) {
           player.vy = -16.5;
           player.onGround = false;
           p.boostCooldown = 28;
+          p.boostArmed = false;
           spawnParticles(p.x + p.w/2, p.y + p.h/2, '#60a5fa', 14);
           showToast('JUMP PAD!');
         }
@@ -2225,7 +2432,8 @@ function update() {
   while (platformEnd-scrollX < W*2.5) platformEnd = generatePlatforms(platformEnd+60, 10);
 
   // cull old objects
-  platforms   = platforms.filter(p => p.x-scrollX > -500);
+  const cullBuffer = inHiddenLevel ? 4200 : 500;
+  platforms   = platforms.filter(p => p.x-scrollX > -cullBuffer);
   enemies     = enemies.filter(e => e.x-scrollX > -400);
   fruits      = fruits.filter(f => f.x-scrollX > -400);
   healthPacks = healthPacks.filter(h => h.x-scrollX > -400);
@@ -2290,7 +2498,7 @@ function update() {
     // stomp
     if (invincibleTimer<=0 && player.x + PW > e.x + 3 && player.x < e.x + e.w - 3) {
       if (player.vy>0 && player.y+PH > e.y+2 && player.y+PH < e.y+e.h+12) {
-        e.hp--; player.vy=-8;
+        e.hp -= e.type === 'flower' ? e.hp : 1; player.vy=-8;
         if (e.hp<=0) killEnemy(e); else spawnParticles(e.x+e.w/2, e.y, '#f97316', 6);
       } else if (player.y+PH > e.y+8 && player.y < e.y+e.h) {
         stripFlightAndPower('p1', 'enemy');
@@ -2385,6 +2593,9 @@ function update() {
     }
   });
 
+  activateHiddenPuzzleSwitch(player);
+  if (coopMode && player2 && player2.respawnTimer <= 0) activateHiddenPuzzleSwitch(player2);
+
   // level door
   if (levelDoor && levelDoor.active && levelTransition === 0 &&
       player.x + PW > levelDoor.x && player.x < levelDoor.x + levelDoor.w &&
@@ -2418,16 +2629,23 @@ function update() {
   if (hiddenTrigger && hiddenTrigger.active && levelTransition === 0) {
     if (player.x + PW > hiddenTrigger.x && player.x < hiddenTrigger.x + hiddenTrigger.w &&
         player.y + PH > hiddenTrigger.y && player.y < hiddenTrigger.y + hiddenTrigger.h) {
+      if (hiddenTrigger.locked && hiddenPuzzle && !hiddenPuzzle.solved) {
+        if (doorLockToastTimer <= 0) {
+          showToast(hiddenPuzzle.hint.toUpperCase());
+          doorLockToastTimer = 60;
+        }
+      } else {
       hiddenTrigger.active = false;
       playSecretSound();
       showToast('★ SECRET FOUND! ★');
       nextLevelOrHidden(-1);
+      }
     }
   }
 
   // ── BOSS ──
   if (boss && !boss.dead && !inHiddenLevel) {
-    if (!boss.activated && player.x > boss.x - 380) {
+    if (!boss.activated && (currentLevel !== 1 || isLevelTwoBoardReady()) && player.x > boss.x - 500) {
       boss.activated = true;
       showToast('⚔ BOSS: ' + boss.name + ' ⚔');
     }
@@ -2446,7 +2664,7 @@ function update() {
         if (e.dead) return;
         if (player2.x + PW > e.x + 3 && player2.x < e.x + e.w - 3) {
           if (player2.vy > 0 && player2.y + PH > e.y + 2 && player2.y + PH < e.y + e.h + 12) {
-            e.hp--; player2.vy = -8;
+            e.hp -= e.type === 'flower' ? e.hp : 1; player2.vy = -8;
             if (e.hp <= 0) killEnemy(e); else spawnParticles(e.x+e.w/2, e.y, '#f97316', 5);
           } else if (player2.y + PH > e.y + 8 && player2.y < e.y + e.h) {
             stripFlightAndPower('p2', 'enemy');
@@ -2508,6 +2726,24 @@ function update() {
     }
   }
 
+  platforms.forEach(p => {
+    if (p.type === 'shaky' && !p.occupied) p.boostArmed = true;
+    if (p.type === 'sinking') {
+      if (p.occupied) {
+        p.standTimer = Math.min(180, (p.standTimer || 0) + 1);
+      } else {
+        p.standTimer = Math.max(0, (p.standTimer || 0) - 2);
+      }
+      if (p.standTimer >= 120) p.sinkTriggered = true;
+      if (p.sinkTriggered) {
+        p.y = Math.min((p.baseY ?? p.y) + 88, p.y + (p.occupied ? 1.8 : 1.15));
+      } else if (p.y > (p.baseY ?? p.y)) {
+        p.y = Math.max(p.baseY, p.y - 1.35);
+      }
+      if (!p.occupied && p.y <= (p.baseY ?? p.y) && p.standTimer === 0) p.sinkTriggered = false;
+    }
+  });
+
   // passive score only while actually moving through the level
   const p1ActiveMovement = Math.abs(player.vx) > 0.4 || Math.abs(player.vy) > 0.8 || player.dashing;
   const p2ActiveMovement = coopMode && player2 && (Math.abs(player2.vx) > 0.4 || Math.abs(player2.vy) > 0.8 || player2.dashing);
@@ -2531,7 +2767,7 @@ function update() {
   heartPopups = heartPopups.filter(h=>h.life>0);
 
   // fall death
-  if (player.y > H + 32 && tryHelperVoidSave()) return;
+  if (player.y > H - 8 && tryHelperVoidSave()) return;
   if ((inWaterVoid || inLevelOneRiver) && player.y > H - 8) {
     startWaterDeath();
     return;
@@ -2598,15 +2834,17 @@ function tryRespawnPlayer() {
 
 function tryHelperVoidSave() {
   if (!helperUnlocked || !helperBot || helperBot.cooldown > 0) return false;
-  const plat = activeCheckpoint ? findRespawnPlatformAt(activeCheckpoint.x) : findSupportPlatformAt(player.x, H - 58, 120);
+  const plat = (activeCheckpoint && findRespawnPlatformAt(activeCheckpoint.x))
+    || findBestRescuePlatform(player.x + PW/2)
+    || findSupportPlatformAt(player.x, H - 58, 220);
   if (!plat) return false;
   helperBot.cooldown = HELPER_COOLDOWN;
-  helperBot.x = player.x;
-  helperBot.y = Math.min(player.y, H - 60);
+  helperBot.x = player.x + PW/2;
+  helperBot.y = Math.min(player.y, H - 76);
   player.x = Math.max(plat.x + 4, Math.min(plat.x + plat.w/2 - PW/2, plat.x + plat.w - PW - 4));
   player.y = plat.y - PH;
   player.vx = 0;
-  player.vy = -2;
+  player.vy = -4;
   invincibleTimer = 90;
   spawnParticles(player.x + PW/2, player.y + PH/2, '#60a5fa', 24);
   showToast('ALLY BOT RESCUE!');
@@ -2702,6 +2940,14 @@ function updateBoss() {
   // World edge bouncing
   if (b.x < 10) { b.x = 10; b.vx = Math.abs(b.vx); }
   if (b.x + b.w > LEVEL_LENGTH + 60) { b.x = LEVEL_LENGTH + 60 - b.w; b.vx = -Math.abs(b.vx); }
+  if (b.onGround) {
+    const leadX = b.vx >= 0 ? b.x + b.w + 18 : b.x - 18;
+    const support = findSupportPlatformAt(leadX, b.y + b.h + 4, 22);
+    if (!support) {
+      b.vx *= -1;
+      b.x += b.vx * 1.6;
+    }
+  }
 
   // Chase player
   if (b.pattern !== 'dash' || !b.dashActive) {
@@ -2801,7 +3047,8 @@ function killBoss() {
 
 function updateBossHUD() {
   const bar = document.getElementById('bossBar');
-  if (!boss || boss.dead || !boss.activated) { bar.classList.remove('show'); return; }
+  const playerNearBoss = boss && !boss.dead && Math.abs((boss.x + boss.w/2) - (player.x + PW/2)) < 560;
+  if (!boss || boss.dead || (!boss.activated && !playerNearBoss)) { bar.classList.remove('show'); return; }
   bar.classList.add('show');
   document.getElementById('bossName').textContent = '⚔ ' + boss.name + (boss.phase2 ? ' ✦ ENRAGED' : '');
   document.getElementById('bossBarFill').style.width = Math.max(0, (boss.hp / boss.maxHp) * 100) + '%';
@@ -2955,13 +3202,14 @@ function updatePlayer2() {
     else if (player2.vx<=0 && nx<p.x+p.w && player2.x>=p.x+p.w-3 && ny+PH>p.y+2 && ny<p.y+p.h-2)
       { nx=p.x+p.w; player2.vx=0; player2.wallContact=true; player2.wallContactDir=-1; }
     if (player2.vy>=0 && ny+PH>=p.y && player2.y+PH<=p.y+p.h && nx+PW>p.x && nx<p.x+p.w)
-      { ny=p.y-PH; player2.vy=0; player2.onGround=true; player2.usedDouble=false;
+      { ny=p.y-PH; player2.vy=0; player2.onGround=true; player2.usedDouble=false; p.occupied = true;
         if (p.type === 'shaky' && !p.falling) {
           p.standTimer = (p.standTimer || 0) + 1;
-          if ((p.boostCooldown || 0) <= 0) {
+          if (p.boostArmed !== false && (p.boostCooldown || 0) <= 0) {
             player2.vy = -16.5;
             player2.onGround = false;
             p.boostCooldown = 28;
+            p.boostArmed = false;
             spawnParticles(p.x+p.w/2, p.y+p.h/2, '#60a5fa', 12);
           }
         }
@@ -3363,6 +3611,36 @@ function drawBg(b) {
     mgG.addColorStop(0,'rgba(220,38,38,0)'); mgG.addColorStop(1,'rgba(220,38,38,0.45)');
     ctx.fillStyle=mgG; ctx.fillRect(0,0,W,H);
   }
+
+  if (inHiddenLevel) drawVoidEyes();
+}
+
+function drawVoidEyes() {
+  const targetX = ((player.x - scrollX) / Math.max(1, W)) * 2 - 1;
+  const targetY = (player.y / Math.max(1, H)) * 2 - 1;
+  const pairs = [
+    { x: W * 0.22 + Math.sin(frameCount * 0.02) * 10, y: H * 0.20 },
+    { x: W * 0.78 + Math.cos(frameCount * 0.018) * 12, y: H * 0.28 },
+  ];
+  pairs.forEach((pair, idx) => {
+    const blink = Math.abs(Math.sin(frameCount * 0.03 + idx * 1.7));
+    const eyeOpen = blink < 0.08 ? 1.5 : 8;
+    [-18, 18].forEach(side => {
+      const ex = pair.x + side;
+      const ey = pair.y + Math.sin(frameCount * 0.04 + idx + side) * 2;
+      ctx.save();
+      ctx.globalAlpha = 0.55;
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = '#fef08a';
+      ctx.fillStyle = 'rgba(15,23,42,0.82)';
+      ctx.beginPath(); ctx.ellipse(ex, ey, 13, eyeOpen, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath(); ctx.ellipse(ex, ey, 10, Math.max(1.2, eyeOpen - 1.5), 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0f172a';
+      ctx.beginPath(); ctx.arc(ex + targetX * 3.4, ey + targetY * 2.4, 3.2, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    });
+  });
 }
 
 function drawPlatforms(b) {
@@ -3371,9 +3649,9 @@ function drawPlatforms(b) {
     if (px+p.w<-10||px>W+10) return;
     const shakeX = p.type === 'shaky' && !p.falling ? Math.sin(frameCount * 0.4 + (p.shakePhase || 0)) * Math.min(3, (p.standTimer || 0) / 45) : 0;
     const py = p.y + (p.type === 'shaky' && p.falling ? Math.sin(frameCount * 0.7 + px) * 1.5 : 0);
-    ctx.fillStyle=b.ground;
+    ctx.fillStyle = p.type === 'sinking' ? '#7c3aed' : b.ground;
     ctx.beginPath(); ctx.roundRect(px + shakeX, py, p.w, p.h, 4); ctx.fill();
-    ctx.fillStyle=b.accent;
+    ctx.fillStyle = p.type === 'sinking' ? '#c4b5fd' : b.accent;
     ctx.fillRect(px + 3 + shakeX, py, p.w-6, 3);
     // moving platform indicator
     if (p.type==='moving') {
@@ -3382,7 +3660,34 @@ function drawPlatforms(b) {
     } else if (p.type==='shaky') {
       ctx.fillStyle = p.falling ? 'rgba(239,68,68,0.65)' : 'rgba(250,204,21,0.6)';
       ctx.fillRect(px + p.w/2 - 7 + shakeX, py + 4, 14, 4);
+    } else if (p.type === 'sinking') {
+      const warn = Math.min(1, Math.max(0, ((p.standTimer || 0) - 90) / 30));
+      ctx.fillStyle = `rgba(248,113,113,${0.35 + warn * 0.45})`;
+      ctx.fillRect(px + p.w/2 - 8 + shakeX, py + 4, 16, 4);
     }
+  });
+}
+
+function drawHiddenPuzzle() {
+  if (!hiddenPuzzle || inHiddenLevel) return;
+  hiddenPuzzle.switches.forEach((sw, idx) => {
+    const sx = sw.x - scrollX;
+    if (sx < -40 || sx > W + 40) return;
+    const pulse = (Math.sin(frameCount * 0.14 + idx) + 1) * 0.5;
+    const next = idx === hiddenPuzzle.progress && !hiddenPuzzle.solved;
+    const solved = sw.active || hiddenPuzzle.solved;
+    const resetFlash = hiddenPuzzle.resetFlash > 0 ? hiddenPuzzle.resetFlash / 18 : 0;
+    ctx.save();
+    ctx.translate(sx, sw.y);
+    ctx.shadowBlur = solved ? 16 : (next ? 14 : 6);
+    ctx.shadowColor = solved ? '#fde68a' : (next ? '#60a5fa' : `rgba(255,255,255,${0.2 + resetFlash * 0.5})`);
+    ctx.fillStyle = solved ? '#fde68a' : (next ? '#60a5fa' : '#334155');
+    ctx.beginPath(); ctx.arc(0, 0, sw.r - (next ? pulse * 1.4 : 0), 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = solved ? '#78350f' : '#e2e8f0';
+    ctx.font = 'bold 9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(sw.label, 0, 3);
+    ctx.restore();
   });
 }
 
@@ -3476,9 +3781,11 @@ function drawHiddenTrigger() {
   const hy = hiddenTrigger.y;
   const pulse = (Math.sin(frameCount * 0.13) + 1) / 2;
   const s = hiddenTrigger.style || 'crystal';
+  const locked = hiddenTrigger.locked && hiddenPuzzle && !hiddenPuzzle.solved;
 
   ctx.save();
   ctx.translate(hx + hiddenTrigger.w/2, hy + hiddenTrigger.h/2);
+  if (locked) ctx.globalAlpha = 0.42 + pulse * 0.08;
 
   if (s === 'crystal') {
     // Icy crystal shard — subtle blue shimmer, easy to miss as part of ceiling
@@ -3522,6 +3829,13 @@ function drawHiddenTrigger() {
     ctx.beginPath(); ctx.moveTo(-10,15); ctx.lineTo(0,-5); ctx.lineTo(8,10); ctx.lineTo(-2,18); ctx.stroke();
   }
 
+  if (locked) {
+    ctx.fillStyle = '#fff7cc';
+    ctx.font = 'bold 10px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('LOCK', 0, hiddenTrigger.h/2 + 14);
+    ctx.textAlign = 'left';
+  }
   ctx.restore();
 }
 
@@ -3620,37 +3934,44 @@ function drawEnemies(b) {
     ctx.save();
     ctx.translate(ex + e.w/2, e.y + e.h/2);
 
-    // body
-    ctx.fillStyle = `hsl(${Math.round(ratio*30)},80%,35%)`;
-    ctx.beginPath(); ctx.roundRect(-e.w/2, -e.h/2 + squish*0.5, e.w, e.h - squish, 5); ctx.fill();
+    // shell/body
+    ctx.fillStyle = `hsl(${18 + Math.round(ratio*18)},58%,22%)`;
+    ctx.beginPath(); ctx.ellipse(0, 1 + squish*0.25, e.w * 0.48, e.h * 0.40, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `hsl(${12 + Math.round(ratio*12)},62%,30%)`;
+    ctx.beginPath(); ctx.ellipse(0, -2 + squish*0.18, e.w * 0.34, e.h * 0.26, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath(); ctx.ellipse(-2, -7, 4, 2, -0.4, 0, Math.PI * 2); ctx.fill();
 
-    // horns
-    ctx.fillStyle = '#7c3aed';
-    ctx.beginPath(); ctx.moveTo(-6, -e.h/2 + squish*0.5); ctx.lineTo(-9, -e.h/2 - 7 + squish*0.5); ctx.lineTo(-3, -e.h/2 + squish*0.5); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(6, -e.h/2 + squish*0.5); ctx.lineTo(9, -e.h/2 - 7 + squish*0.5); ctx.lineTo(3, -e.h/2 + squish*0.5); ctx.fill();
-
-    // angry eyebrows
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(-7, -5 + squish*0.5); ctx.lineTo(-2, -3 + squish*0.5); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(7, -5 + squish*0.5); ctx.lineTo(2, -3 + squish*0.5); ctx.stroke();
+    // antennae
+    ctx.strokeStyle = '#111827'; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(-4, -e.h/2 + 4); ctx.quadraticCurveTo(-9, -e.h/2 - 8, -12, -e.h/2 - 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4, -e.h/2 + 4); ctx.quadraticCurveTo(9, -e.h/2 - 8, 12, -e.h/2 - 4); ctx.stroke();
 
     // glowing eyes
     ctx.fillStyle = '#fef08a';
-    ctx.beginPath(); ctx.arc(-5, -1 + squish*0.5, 3, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(5, -1 + squish*0.5, 3, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-4, -3 + squish*0.2, 2.6, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4, -3 + squish*0.2, 2.6, 0, Math.PI*2); ctx.fill();
     ctx.fillStyle = '#dc2626';
-    ctx.beginPath(); ctx.arc(-5, -1 + squish*0.5, 1.5, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(5, -1 + squish*0.5, 1.5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(-4, -3 + squish*0.2, 1.2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(4, -3 + squish*0.2, 1.2, 0, Math.PI*2); ctx.fill();
 
-    // fangs
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.moveTo(-4, 5 + squish*0.5); ctx.lineTo(-2, 9 + squish*0.5); ctx.lineTo(0, 5 + squish*0.5); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(0, 5 + squish*0.5); ctx.lineTo(2, 9 + squish*0.5); ctx.lineTo(4, 5 + squish*0.5); ctx.fill();
+    // mandibles
+    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(-3, 4); ctx.lineTo(-6, 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(3, 4); ctx.lineTo(6, 8); ctx.stroke();
 
-    // feet (walk animation)
-    ctx.fillStyle = `hsl(${Math.round(ratio*30)},70%,25%)`;
-    ctx.beginPath(); ctx.roundRect(-e.w/2+1, e.h/2-2+walkSwing, 6, 4, 2); ctx.fill();
-    ctx.beginPath(); ctx.roundRect(e.w/2-7,  e.h/2-2-walkSwing, 6, 4, 2); ctx.fill();
+    // legs
+    ctx.strokeStyle = `hsl(${15 + Math.round(ratio*15)},45%,18%)`; ctx.lineWidth = 1.8;
+    for (let side of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const yOff = -1 + i * 6;
+        const walk = walkSwing * (0.3 + i * 0.15) * side;
+        ctx.beginPath();
+        ctx.moveTo(side * 5, yOff);
+        ctx.lineTo(side * (9 + i * 2), yOff + 3 + walk);
+        ctx.stroke();
+      }
+    }
 
     ctx.restore();
 
@@ -3795,16 +4116,20 @@ function drawPlayer() {
       : (player.onGround && Math.abs(player.vx) > 0.5 ? Math.sin(pWalkTick * 2.2) * 4 : 0);
     ctx.fillStyle = bodyCol;
     if (player.flyTimer > 0) {
+      const legLift = wingSwing * 0.35;
       ctx.save();
-      ctx.translate(-PW/2 + 4, PH/2 - 4);
-      ctx.rotate((-0.5 + wingSwing * 0.03));
-      ctx.beginPath(); ctx.roundRect(-2, -1, 10, 4, 2); ctx.fill();
+      ctx.translate(-PW/2 + 5, PH/2 - 6);
+      ctx.rotate(-0.55 + legLift * 0.03);
+      ctx.beginPath(); ctx.roundRect(-1, -1, 4, 12, 2); ctx.fill();
       ctx.restore();
       ctx.save();
-      ctx.translate(PW/2 - 4, PH/2 - 4);
-      ctx.rotate((0.5 - wingSwing * 0.03));
-      ctx.beginPath(); ctx.roundRect(-8, -1, 10, 4, 2); ctx.fill();
+      ctx.translate(PW/2 - 5, PH/2 - 6);
+      ctx.rotate(0.55 - legLift * 0.03);
+      ctx.beginPath(); ctx.roundRect(-3, -1, 4, 12, 2); ctx.fill();
       ctx.restore();
+      ctx.fillStyle = '#fde68a';
+      ctx.fillRect(-PW/2 + 2, PH/2 + 4 + legLift * 0.12, 3, 3);
+      ctx.fillRect(PW/2 - 5, PH/2 + 4 - legLift * 0.12, 3, 3);
     } else {
       ctx.beginPath(); ctx.roundRect(-PW/2+1, PH/2-2+swing, 7, 5, 2); ctx.fill();
       ctx.beginPath(); ctx.roundRect(PW/2-8, PH/2-2-swing, 7, 5, 2); ctx.fill();
@@ -3909,6 +4234,7 @@ function draw() {
   const b=BIOMES[currentBiome];
   drawBg(b);
   drawPlatforms(b);
+  drawHiddenPuzzle();
   drawItemBoxes();
   drawDoor();
   drawHiddenTrigger();
@@ -4042,16 +4368,20 @@ function drawPlayer2() {
     const swing = player2.flyTimer > 0 ? wingSwing : (player2.onGround && Math.abs(player2.vx) > 0.5 ? Math.sin(p2WalkTick*2.2)*4 : 0);
     ctx.fillStyle = bodyCol;
     if (player2.flyTimer > 0) {
+      const legLift = wingSwing * 0.35;
       ctx.save();
-      ctx.translate(-PW/2 + 4, PH/2 - 4);
-      ctx.rotate((-0.5 + wingSwing * 0.03));
-      ctx.beginPath(); ctx.roundRect(-2, -1, 10, 4, 2); ctx.fill();
+      ctx.translate(-PW/2 + 5, PH/2 - 6);
+      ctx.rotate(-0.55 + legLift * 0.03);
+      ctx.beginPath(); ctx.roundRect(-1, -1, 4, 12, 2); ctx.fill();
       ctx.restore();
       ctx.save();
-      ctx.translate(PW/2 - 4, PH/2 - 4);
-      ctx.rotate((0.5 - wingSwing * 0.03));
-      ctx.beginPath(); ctx.roundRect(-8, -1, 10, 4, 2); ctx.fill();
+      ctx.translate(PW/2 - 5, PH/2 - 6);
+      ctx.rotate(0.55 - legLift * 0.03);
+      ctx.beginPath(); ctx.roundRect(-3, -1, 4, 12, 2); ctx.fill();
       ctx.restore();
+      ctx.fillStyle = '#fde68a';
+      ctx.fillRect(-PW/2 + 2, PH/2 + 4 + legLift * 0.12, 3, 3);
+      ctx.fillRect(PW/2 - 5, PH/2 + 4 - legLift * 0.12, 3, 3);
     } else {
       ctx.beginPath(); ctx.roundRect(-PW/2+1, PH/2-2+swing, 7, 5, 2); ctx.fill();
       ctx.beginPath(); ctx.roundRect(PW/2-8,  PH/2-2-swing, 7, 5, 2); ctx.fill();
@@ -4092,40 +4422,48 @@ function drawBoss() {
 
   if (b.phase2) { ctx.shadowBlur=18+pulse*12; ctx.shadowColor='#ef4444'; }
 
-  // Body
+  ctx.fillStyle = '#111827';
+  ctx.beginPath(); ctx.ellipse(0, 2, b.w * 0.44, b.h * 0.40, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = b.col;
-  ctx.beginPath(); ctx.roundRect(-b.w/2, -b.h/2, b.w, b.h, 9); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, 0, b.w * 0.42, b.h * 0.36, 0, 0, Math.PI * 2); ctx.fill();
 
-  // Accent stripe
   ctx.shadowBlur = 0;
   ctx.fillStyle = b.accent;
-  ctx.fillRect(-b.w/2+5, -b.h/2+10, b.w-10, 6);
+  ctx.beginPath(); ctx.roundRect(-b.w * 0.24, -b.h * 0.10, b.w * 0.48, b.h * 0.18, 6); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.18)';
+  ctx.beginPath(); ctx.ellipse(-b.w * 0.14, -b.h * 0.14, b.w * 0.11, b.h * 0.07, -0.4, 0, Math.PI * 2); ctx.fill();
 
-  // Triple horns (gold)
-  ctx.fillStyle = '#ffd700';
-  [[-14,-18],[0,-22],[14,-18]].forEach(([hx, len]) => {
+  // cleaner horns
+  ctx.fillStyle = '#fef3c7';
+  [[-b.w*0.24,-b.h*0.28], [0,-b.h*0.35], [b.w*0.24,-b.h*0.28]].forEach(([hx, hy], idx) => {
+    const hornH = idx === 1 ? 14 : 11;
     ctx.beginPath();
-    ctx.moveTo(hx-5, -b.h/2); ctx.lineTo(hx, -b.h/2+len); ctx.lineTo(hx+5, -b.h/2);
+    ctx.moveTo(hx - 5, -b.h * 0.30);
+    ctx.quadraticCurveTo(hx, hy - hornH, hx + 5, -b.h * 0.30);
+    ctx.closePath();
     ctx.fill();
   });
 
-  // Eyes
+  // eyes and brow ridge
+  ctx.strokeStyle='#020617'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.moveTo(-18,-12); ctx.lineTo(-5,-9); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(18,-12); ctx.lineTo(5,-9); ctx.stroke();
   ctx.fillStyle='#fef08a';
-  ctx.beginPath(); ctx.arc(-13,-5,7,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(13,-5,7,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(-12,-4,6,7,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(12,-4,6,7,0,0,Math.PI*2); ctx.fill();
   ctx.fillStyle='#dc2626';
-  ctx.beginPath(); ctx.arc(-13,-5,3.5,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.arc(13,-5,3.5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(-12,-3,2.8,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(12,-3,2.8,0,Math.PI*2); ctx.fill();
 
-  // Angry brows
-  ctx.strokeStyle='#000'; ctx.lineWidth=2.5;
-  ctx.beginPath(); ctx.moveTo(-20,-13); ctx.lineTo(-7,-9); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(20,-13); ctx.lineTo(7,-9); ctx.stroke();
-
-  // Big fangs
+  // mandibles and jaw
+  ctx.fillStyle = '#7f1d1d';
+  ctx.beginPath(); ctx.roundRect(-b.w*0.18, b.h*0.08, b.w*0.36, b.h*0.16, 5); ctx.fill();
   ctx.fillStyle='#fff';
-  ctx.beginPath(); ctx.moveTo(-8,b.h/2-14); ctx.lineTo(-5,b.h/2-4); ctx.lineTo(-2,b.h/2-14); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(2,b.h/2-14); ctx.lineTo(5,b.h/2-4); ctx.lineTo(8,b.h/2-14); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(-9,b.h/2-16); ctx.lineTo(-4,b.h/2-3); ctx.lineTo(-1,b.h/2-16); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(1,b.h/2-16); ctx.lineTo(4,b.h/2-3); ctx.lineTo(9,b.h/2-16); ctx.fill();
+  ctx.strokeStyle = '#1f2937'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(-b.w*0.30, b.h*0.02); ctx.lineTo(-b.w*0.44, b.h*0.16); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(b.w*0.30, b.h*0.02); ctx.lineTo(b.w*0.44, b.h*0.16); ctx.stroke();
 
   // Phase 2 rage marks
   if (b.phase2) {
