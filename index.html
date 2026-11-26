@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <!-- "Add to Home Screen" opens the game fullscreen with no browser bars -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0a0a0f" />
   <title>AWAKENED</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap" rel="stylesheet">
@@ -28,8 +33,13 @@
     #gameWrapper {
       position: relative;
       background: #000;
-      box-shadow: 0 0 60px rgba(167,139,250,0.25), 0 0 120px rgba(0,0,0,0.8);
-      /* size set dynamically by JS to fill screen while keeping aspect ratio */
+      overflow: hidden;
+      /* sized by fitGame(): fills the whole window/screen; the world gets wider on wide screens */
+    }
+    #ui {
+      position: absolute; left: 0; top: 0;
+      height: 420px;            /* game units — scaled to the real size by fitGame() */
+      transform-origin: 0 0;
     }
 
     /* true fullscreen: wrapper fills entire screen */
@@ -45,7 +55,6 @@
     canvas {
       display: block;
       width: 100%; height: 100%;
-      image-rendering: pixelated;
     }
 
     /* fullscreen toggle button */
@@ -86,6 +95,10 @@
       pointer-events: none;
     }
     #hud .left, #hud .right { display: flex; flex-direction: column; gap: 4px; }
+    /* keep clear of the MENU button (top-left) and fullscreen button (top-right) */
+    #hud .left  { padding-top: 32px; }
+    #hud .right { padding-right: 28px; }
+    #missionBox { pointer-events: auto; }
     #hud .stat {
       font-family: 'Share Tech Mono', monospace;
       font-size: 12px;
@@ -121,11 +134,12 @@
       background: rgba(0,0,0,0.82);
       backdrop-filter: blur(2px);
     }
+    .screen { overflow: hidden; padding: 12px 18px; }
     .screen.hidden { display: none; }
 
     .screen-title {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: clamp(48px, 10vw, 80px);
+      font-size: 64px;
       letter-spacing: 10px;
       color: #fff;
       text-shadow: 0 0 30px rgba(167,139,250,0.6);
@@ -272,7 +286,7 @@
     #loadingScreen.fade-out { opacity: 0; pointer-events: none; }
     .load-title {
       font-family: 'Bebas Neue', sans-serif;
-      font-size: clamp(52px, 11vw, 88px);
+      font-size: 84px;
       letter-spacing: 12px;
       color: #fff;
       text-shadow: 0 0 40px rgba(167,139,250,0.8);
@@ -338,36 +352,190 @@
     #tutorial .tut-row { color: rgba(255,255,255,0.75); font-size: 11px; letter-spacing: 1px; margin: 2px 0; }
     #tutorial .tut-row b { color: var(--gold); font-weight: normal; }
 
-    /* Mobile controls */
-    #mobileControls {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      display: none;
-      padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
-      justify-content: space-between;
-      align-items: flex-end;
-    }
-    @media (pointer: coarse) { #mobileControls { display: flex; } }
-    .dpad { display: grid; grid-template-columns: 52px 52px 52px; grid-template-rows: 52px 52px; gap: 6px; }
+    /* ── Touch controls ───────────────────────────────────── */
+    body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+    .touch-only { display: none; }
+    body.touch .touch-only { display: block; }
+    body.touch .keys-only { display: none; }
+
+    #touchUI { position: fixed; inset: 0; pointer-events: none; z-index: 30; display: none; }
+    body.touch.playing #touchUI { display: block; }
     .mbtn {
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 10px;
-      color: #fff; font-size: 22px;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 14px;
+      color: rgba(255,255,255,0.85); font-size: 22px;
+      font-family: 'Share Tech Mono', monospace;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; user-select: none; touch-action: none;
-      -webkit-tap-highlight-color: transparent;
-      min-width: 52px; min-height: 52px;
+      width: 66px; height: 66px;
+      pointer-events: auto;
+      transition: background 0.06s, transform 0.06s;
     }
-    .mbtn:active { background: rgba(255,255,255,0.25); }
-    .mbtn.action { width: 62px; height: 62px; font-size: 16px; border-radius: 50%; background: rgba(167,139,250,0.2); border-color: var(--purple); }
-    .action-btns { display: flex; gap: 12px; align-items: flex-end; }
-    @media (pointer: coarse) and (max-width: 760px) {
-      #hud { padding-top: 44px; }
-      #mobileControls { padding-left: 14px; padding-right: 14px; }
-      .dpad { grid-template-columns: 58px 58px 58px; grid-template-rows: 58px 58px; gap: 7px; }
-      .mbtn { min-width: 58px; min-height: 58px; font-size: 24px; }
-      .mbtn.action { width: 70px; height: 70px; font-size: 17px; }
+    .mbtn.pressed { background: rgba(255,255,255,0.32); transform: scale(0.93); }
+    .mbtn.action { width: 60px; height: 60px; font-size: 13px; letter-spacing: 1px; border-radius: 50%; background: rgba(167,139,250,0.18); border-color: var(--purple); }
+    .mbtn.action.jump { width: 74px; height: 74px; background: rgba(255,215,0,0.16); border-color: var(--gold); }
+    .mbtn.action.pressed { background: rgba(167,139,250,0.48); }
+    /* attack/dash buttons only appear once you've unlocked them */
+    body:not(.can-attack) .atk-btn, body:not(.can-dash) #mDash { display: none; }
+
+    /* BUTTONS mode */
+    #mobileControls {
+      position: absolute; left: 0; right: 0; bottom: 0;
+      display: none; justify-content: space-between; align-items: flex-end;
+      padding: 0 calc(16px + env(safe-area-inset-right, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
     }
+    body.ctl-buttons #mobileControls { display: flex; }
+    .dpad, .action-btns { display: flex; gap: 10px; align-items: flex-end; }
+
+    /* TAP + TILT modes: single ATK button bottom-right */
+    #tAtk {
+      position: absolute; display: none;
+      right: calc(18px + env(safe-area-inset-right, 0px));
+      bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    }
+    body.ctl-tap.can-attack #tAtk, body.ctl-tilt.can-attack #tAtk { display: flex; }
+
+    #tiltMeter {
+      position: absolute; display: none;
+      left: 50%; bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+      width: 120px; height: 6px; margin-left: -60px;
+      border-radius: 3px; background: rgba(255,255,255,0.14);
+    }
+    #tiltMeter::after { content: ''; position: absolute; left: 50%; top: -3px; width: 1px; height: 12px; background: rgba(255,255,255,0.35); }
+    body.ctl-tilt #tiltMeter { display: block; }
+    #tiltDot { position: absolute; top: -3px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--gold); transition: left 0.05s linear; }
+
+    /* first seconds of a run: show what each half of the screen does */
+    #zoneHint {
+      position: absolute; inset: 0; display: flex; opacity: 0; transition: opacity 0.6s;
+      font-family: 'Share Tech Mono', monospace; font-size: 13px; letter-spacing: 2px; color: rgba(255,255,255,0.85);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+    }
+    #zoneHint.show { opacity: 1; }
+    #zoneHint .zone { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.7; }
+    #zoneHint .zone.l { border-right: 1px dashed rgba(255,255,255,0.35); background: rgba(167,139,250,0.10); }
+    #zoneHint .zone.r { background: rgba(255,215,0,0.08); }
+    #zoneHint .zone.all { background: rgba(255,215,0,0.06); }
+    #zoneHint .mid {
+      position: absolute; left: 50%; top: 22%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.6); border: 1px solid var(--gold); border-radius: 6px;
+      padding: 6px 14px; color: var(--gold); white-space: nowrap;
+    }
+
+    /* control picker on start + pause screens */
+    .ctl-picker { margin-top: 10px; text-align: center; }
+    .ctl-label { font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.45); margin-bottom: 5px; }
+    .ctl-options { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+    .ctl-opt {
+      font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 1px;
+      color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+      padding: 7px 10px; cursor: pointer;
+    }
+    .ctl-opt.active { color: #0a0a0f; background: var(--gold); border-color: var(--gold); }
+
+    /* portrait phone: ask to rotate */
+    #rotateHint {
+      position: fixed; inset: 0; z-index: 100; display: none;
+      flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+      background: #0a0a0f; color: #fff; font-family: 'Share Tech Mono', monospace; letter-spacing: 3px; font-size: 14px; text-align: center; padding: 24px;
+    }
+    #rotateHint .rot-icon { font-size: 54px; animation: rotHint 2s ease-in-out infinite; }
+    #rotateHint .rot-sub { font-size: 10px; color: rgba(255,255,255,0.45); }
+    @keyframes rotHint { 0%,30% { transform: rotate(0deg); } 60%,100% { transform: rotate(-90deg); } }
+    @media (pointer: coarse) and (orientation: portrait) { #rotateHint { display: flex; } }
+
+    /* Start screen: two columns + credits footer (fits 420 tall, no scrolling) */
+    #startScreen { justify-content: space-between; padding: 14px 22px 10px; }
+    .start-layout { flex: 1; min-height: 0; width: 100%; display: flex; gap: 22px; align-items: center; }
+    .start-left { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .start-right { flex: 0 0 236px; }
+    #startScreen .screen-title { font-size: 66px; letter-spacing: 8px; line-height: 1; }
+    #startScreen .screen-sub { margin: 4px 0 12px; font-size: 10px; letter-spacing: 2px; }
+    #startScreen .controls-grid { grid-template-columns: 1fr; gap: 4px; margin-bottom: 10px; text-align: left; }
+    #startScreen .ctrl { font-size: 11px; }
+    #coopIndicator { margin: 0 0 6px; }
+    .start-actions { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 10px; }
+    #startScreen .highscore-line { margin-top: 6px; }
+    #startScreen .char-preview-wrap { width: 96px; margin-bottom: 6px; padding: 6px; }
+    #startScreen .char-name { font-size: 24px; }
+    #startScreen .char-desc { min-height: 0; margin-top: 4px; font-size: 10px; }
+    #startScreen .char-stats { margin-top: 4px; }
+    #startScreen .char-swatches { margin-top: 6px; }
+    #startScreen .char-btn { width: 32px; height: 32px; font-size: 18px; flex: 0 0 auto; }
+    #startScreen .power-bar { justify-content: center; margin: 8px 0 0; }
+    #startScreen .char-help { margin-top: 6px; }
+    #startScreen .credits-block { margin-top: 6px; font-size: 9px; line-height: 1.5; max-width: none; }
+
+    /* squarer screens (iPad, 4:3 windows): tighten the start screen */
+    #ui.narrow #startScreen { padding: 12px 14px 8px; }
+    #ui.narrow .start-layout { gap: 12px; }
+    #ui.narrow #startScreen .screen-title { font-size: 48px; letter-spacing: 5px; }
+    #ui.narrow .start-right { flex-basis: 206px; }
+    #ui.narrow #pauseScreen { padding: 10px 12px; }
+    #ui.narrow .pause-layout { gap: 12px; }
+    #ui.narrow .pause-left { flex-basis: 190px; }
+
+    /* Pause screen: actions | settings + character */
+    #pauseScreen { padding: 12px 22px; }
+    .pause-layout { width: 100%; height: 100%; display: flex; gap: 24px; align-items: center; justify-content: center; }
+    .pause-left { flex: 0 0 210px; display: flex; flex-direction: column; align-items: stretch; }
+    .pause-right { flex: 0 1 280px; display: flex; flex-direction: column; gap: 8px; }
+    #pauseScreen .pause-title { font-size: 44px; margin-bottom: 6px; text-align: center; }
+    #pauseScreen .menu-btn { min-width: 0; margin: 3px 0; padding: 8px 10px; font-size: 12px; }
+    .menu-row { display: flex; gap: 6px; }
+    .menu-row .menu-btn.half { flex: 1; }
+    .esc-hint { margin-top: 8px; font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 2px; text-align: center; }
+    #pauseScreen .menu-section { margin: 0; width: 100%; }
+    #pauseScreen .ctl-picker { margin: 0; }
+    #pauseScreen .char-desc { min-height: 0; margin-top: 3px; font-size: 10px; }
+    #pauseScreen .char-name { font-size: 22px; }
+    #pauseScreen .char-btn { width: 30px; height: 30px; font-size: 16px; flex: 0 0 auto; }
+    #pauseScreen .char-preview-wrap.small { width: 70px; padding: 5px; margin-bottom: 4px; }
+    #pauseScreen .char-stats, #pauseScreen .char-swatches, #pauseScreen .style-swatches { margin-top: 4px; }
+    #pauseScreen .menu-note { margin-top: 5px; }
+
+    /* How To Play walkthrough */
+    #howToScreen { z-index: 25; }
+    .howto-card {
+      width: min(440px, 88%);
+      background: rgba(10,10,18,0.96);
+      border: 1px solid var(--purple); border-radius: 10px;
+      padding: 16px 20px 14px; text-align: center;
+      box-shadow: 0 0 40px rgba(167,139,250,0.25);
+    }
+    .howto-step { font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.4); }
+    .howto-icon { font-size: 34px; margin: 4px 0 2px; }
+    .howto-title { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 6px; color: #fff; }
+    .howto-body { margin-top: 6px; min-height: 84px; }
+    .howto-body .tut-row { color: rgba(255,255,255,0.78); font-size: 12px; letter-spacing: 1px; margin: 5px 0; line-height: 1.4; }
+    .howto-body b { color: var(--gold); font-weight: normal; }
+    .howto-dots { display: flex; gap: 6px; justify-content: center; margin: 10px 0 12px; }
+    .howto-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+    .howto-dots i.on { background: var(--gold); }
+    .howto-actions { display: flex; gap: 8px; justify-content: center; }
+    .howto-btn {
+      font-family: 'Share Tech Mono', monospace; font-size: 13px; letter-spacing: 2px;
+      background: var(--gold); color: #0a0a0f; border: none; border-radius: 6px;
+      padding: 9px 18px; cursor: pointer; min-width: 92px;
+    }
+    .howto-btn.ghost { background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.25); }
+    .howto-btn:disabled { visibility: hidden; }
+    .howto-hint { margin-top: 10px; font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.3); }
+    .howto-link {
+      margin-top: 8px; font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 2px;
+      background: none; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.65);
+      border-radius: 6px; padding: 6px 12px; cursor: pointer;
+    }
+    .howto-link:hover { color: #fff; border-color: rgba(255,255,255,0.5); }
+
+    /* small screens (phones in landscape): tighter HUD + scrollable menus */
+    #missionBox.collapsed #missionList { display: none; }
+    #missionBox.collapsed #missionTitle { margin-bottom: 0; }
+    /* phones: power-up tips go top-center so they never cover the player */
+    body.touch #tutorial { bottom: auto; top: 10px; }
+    #missionTitle { cursor: pointer; }
 
     /* Co-op indicator */
     #coopIndicator { font-size:11px; color:var(--purple); letter-spacing:3px; margin-top:-16px; margin-bottom:8px; display:none; }
@@ -406,7 +574,7 @@
     .ed-btn.ed-active { background:rgba(167,139,250,0.3); color:#fff; border-color:var(--purple); }
     .ed-sep { height:1px; background:rgba(255,255,255,0.1); margin:2px 0; }
     .char-select {
-      width:min(540px,92vw); margin:16px auto 0; padding:14px 14px 12px;
+      width:100%; margin:0 auto; padding:10px 10px 9px;
       border:1px solid rgba(255,255,255,0.14); border-radius:14px;
       background:rgba(10,10,18,0.72); box-shadow:0 14px 40px rgba(0,0,0,0.28);
     }
@@ -458,7 +626,7 @@
     .menu-section {
       margin-top: 16px;
       padding: 14px 16px;
-      width: min(560px, 92vw);
+      width: 100%;
       border: 1px solid rgba(255,255,255,0.12);
       border-radius: 12px;
       background: rgba(255,255,255,0.04);
@@ -475,6 +643,9 @@
 <div id="gameWrapper">
   <canvas id="c"></canvas>
   <canvas id="confettiCanvas"></canvas>
+  <!-- Everything below is laid out at the game's own size (420 tall) and scaled
+       with the game, so menus always fit the screen exactly — no scrolling. -->
+  <div id="ui">
   <button id="fsBtn" title="Fullscreen">⛶</button>
   <button id="menuHubBtn" title="Menu">MENU</button>
 
@@ -519,56 +690,64 @@
     <div id="tutBody"></div>
   </div>
 
-  <!-- Start Screen -->
+  <!-- Start Screen (two columns so it always fits — no scrolling) -->
   <div class="screen" id="startScreen">
-    <div class="screen-title">AWAKENED</div>
-    <div class="screen-sub">You are nobody. Run. Survive. Become.</div>
-    <div class="controls-grid">
-      <div class="ctrl"><b>← → / A D</b> Move</div>
-      <div class="ctrl"><b>Space / W</b> Jump</div>
-      <div class="ctrl"><b>Shift</b> Dash (lv 3)</div>
-      <div class="ctrl"><b>Z / X</b> Attack (lv 2)</div>
-      <div class="ctrl"><b>Tab</b> Toggle Co-op</div>
-      <div class="ctrl"><b>P2: I J K L + U O</b></div>
-    </div>
-    <div id="coopIndicator">★ CO-OP MODE ACTIVE</div>
-    <div class="char-select">
-      <div class="char-row">
-        <button class="char-btn" id="charPrevBtn">‹</button>
-        <div class="char-card">
-          <div class="char-preview-wrap">
-            <canvas class="char-preview" id="charPreview" width="96" height="96"></canvas>
-          </div>
-          <div class="char-class" id="charClassUI">BALANCED</div>
-          <div class="char-name" id="charNameUI">THE NOBODY</div>
-          <div class="char-desc" id="charDescUI">A blank slate. Master of nothing — yet.</div>
-          <div class="char-stats" id="charStatsUI">HP 6 • SPD 1.00x • START POWER 1</div>
-          <div class="char-swatches" id="charSwatches"></div>
+    <div class="start-layout">
+      <div class="start-left">
+        <div class="screen-title">AWAKENED</div>
+        <div class="screen-sub">You are nobody. Run. Survive. Become.</div>
+        <div class="controls-grid" id="controlsGrid"></div>
+        <div id="coopIndicator">★ CO-OP MODE ACTIVE</div>
+        <div class="ctl-picker touch-only" data-ui>
+        <div class="ctl-label">CONTROLS</div>
+        <div class="ctl-options">
+          <button class="ctl-opt" data-ctl="tap">👆 TAP</button>
+          <button class="ctl-opt" data-ctl="tilt">📱 TILT</button>
+          <button class="ctl-opt" data-ctl="buttons">⬚ BUTTONS</button>
         </div>
-        <button class="char-btn" id="charNextBtn">›</button>
+        </div>
+        <div class="start-actions">
+          <div class="cta">PRESS SPACE TO BEGIN</div>
+          <button class="howto-link" id="startHowToBtn" data-ui>? HOW TO PLAY</button>
+        </div>
+        <div class="highscore-line" id="startHiScore"></div>
       </div>
-      <div class="char-help">LEFT / RIGHT TO CHOOSE</div>
+      <div class="start-right">
+        <div class="char-select">
+          <div class="char-row">
+            <button class="char-btn" id="charPrevBtn">‹</button>
+            <div class="char-card">
+              <div class="char-preview-wrap">
+                <canvas class="char-preview" id="charPreview" width="96" height="96"></canvas>
+              </div>
+              <div class="char-class" id="charClassUI">BALANCED</div>
+              <div class="char-name" id="charNameUI">THE NOBODY</div>
+              <div class="char-desc" id="charDescUI">A blank slate. Master of nothing — yet.</div>
+              <div class="char-stats" id="charStatsUI">HP 6 • SPD 1.00x • START POWER 1</div>
+              <div class="char-swatches" id="charSwatches"></div>
+            </div>
+            <button class="char-btn" id="charNextBtn">›</button>
+          </div>
+          <div class="power-bar" id="startPowerBar">
+            <div class="power-pip active"></div>
+            <div class="power-pip"></div>
+            <div class="power-pip"></div>
+            <div class="power-pip"></div>
+            <div class="power-pip"></div>
+          </div>
+          <div class="char-help keys-only">← → TO CHOOSE · ↑ ↓ COLORS</div>
+        </div>
+      </div>
     </div>
-    <div class="power-bar" id="startPowerBar">
-      <div class="power-pip active"></div>
-      <div class="power-pip"></div>
-      <div class="power-pip"></div>
-      <div class="power-pip"></div>
-      <div class="power-pip"></div>
-    </div>
-    <div class="cta">PRESS SPACE TO BEGIN</div>
     <div class="credits-block">
-      Created by <strong>William Garcia</strong> and <strong>Leanna Garcia</strong><br>
-      Contributions by <strong>Wensel Garcia</strong><br>
-      Led by <strong>Edwin Jaquez</strong><br>
-      Under <strong>Palmchat Innovations LLC</strong>
+      Created by <strong>William Garcia</strong> and <strong>Leanna Garcia</strong> · Contributions by <strong>Wensel Garcia</strong><br>
+      Led by <strong>Edwin Jaquez</strong> · Under <strong>Palmchat Innovations LLC</strong>
     </div>
-    <div class="highscore-line" id="startHiScore"></div>
   </div>
 
   <!-- Death Screen -->
   <div class="screen hidden" id="deathScreen">
-    <div class="screen-title" style="font-size: clamp(36px,8vw,60px); margin-bottom:4px;">YOU LOST</div>
+    <div class="screen-title" style="font-size:56px; margin-bottom:2px;">YOU LOST</div>
     <div class="death-label">SCORE</div>
     <div class="death-score" id="deathScoreUI">0</div>
     <div class="new-best hidden" id="newBestUI">NEW BEST!</div>
@@ -580,7 +759,7 @@
 
   <!-- Name Entry Screen -->
   <div class="screen hidden" id="nameScreen">
-    <div class="screen-title" style="font-size:clamp(32px,7vw,52px); margin-bottom:4px;">YOU LOST</div>
+    <div class="screen-title" style="font-size:50px; margin-bottom:2px;">YOU LOST</div>
     <div class="name-label">YOUR SCORE</div>
     <div class="name-score" id="nameScoreUI">0</div>
     <div class="name-label" style="margin-top:16px;">ENTER YOUR NAME</div>
@@ -588,37 +767,75 @@
     <button class="menu-btn" onclick="submitScore()">SUBMIT SCORE</button>
   </div>
 
-  <!-- Pause Screen -->
+  <!-- Pause Screen (two columns: actions | settings + character) -->
   <div class="screen hidden" id="pauseScreen">
-    <div class="pause-title">PAUSED</div>
-    <button class="menu-btn" onclick="resumeGame()">▶ RESUME</button>
-    <button class="menu-btn" onclick="restartGame()">↻ RESTART</button>
-    <button class="menu-btn" onclick="saveGame()">💾 SAVE GAME</button>
-    <button class="menu-btn" onclick="loadSave()">📂 LOAD SAVE</button>
-    <button class="menu-btn" onclick="toggleEditor()">✏ LEVEL EDITOR</button>
-    <button class="menu-btn danger" onclick="quitToMenu()">✕ QUIT TO MENU</button>
-    <div class="menu-section">
-      <div class="menu-kicker">CHARACTER BAY</div>
-      <div class="char-select" style="margin-top:0;">
-        <div class="char-row">
-          <button class="char-btn" id="pauseCharPrevBtn">‹</button>
-          <div class="char-card">
-            <div class="char-preview-wrap small">
-              <canvas class="char-preview" id="pauseCharPreview" width="96" height="96"></canvas>
-            </div>
-            <div class="char-class" id="pauseCharClassUI">BALANCED</div>
-            <div class="char-name" id="pauseCharNameUI">THE NOBODY</div>
-            <div class="char-desc" id="pauseCharDescUI">A blank slate. Master of nothing — yet.</div>
-            <div class="char-stats" id="pauseCharStatsUI">HP 6 • SPD 1.00x • START POWER 1</div>
-            <div class="char-swatches" id="pauseCharSwatches"></div>
-            <div class="style-swatches" id="styleSwatches"></div>
+    <div class="pause-layout">
+      <div class="pause-left">
+        <div class="pause-title">PAUSED</div>
+        <button class="menu-btn" onclick="resumeGame()">▶ RESUME</button>
+        <button class="menu-btn" onclick="restartGame()">↻ RESTART</button>
+        <div class="menu-row">
+          <button class="menu-btn half" onclick="saveGame()">💾 SAVE</button>
+          <button class="menu-btn half" onclick="loadSave()">📂 LOAD</button>
+        </div>
+        <button class="menu-btn" onclick="openHowTo(false)">? HOW TO PLAY</button>
+        <button class="menu-btn" onclick="toggleEditor()">✏ LEVEL EDITOR</button>
+        <button class="menu-btn danger" onclick="quitToMenu()">✕ QUIT TO MENU</button>
+        <div class="keys-only esc-hint">ESC TO RESUME</div>
+      </div>
+      <div class="pause-right">
+        <div class="ctl-picker touch-only" data-ui>
+        <div class="ctl-label">CONTROLS</div>
+        <div class="ctl-options">
+          <button class="ctl-opt" data-ctl="tap">👆 TAP</button>
+          <button class="ctl-opt" data-ctl="tilt">📱 TILT</button>
+          <button class="ctl-opt" data-ctl="buttons">⬚ BUTTONS</button>
+        </div>
+          <div class="ctl-options tilt-only">
+            <button class="ctl-opt" onclick="recenterTiltFromMenu()">◎ RE-CENTER</button>
+            <button class="ctl-opt" id="tiltInvertBtn" onclick="toggleTiltInvert()">⇆ TILT: NORMAL</button>
           </div>
-          <button class="char-btn" id="pauseCharNextBtn">›</button>
+        </div>
+        <div class="menu-section">
+          <div class="menu-kicker">CHARACTER BAY</div>
+          <div class="char-select">
+            <div class="char-row">
+              <button class="char-btn" id="pauseCharPrevBtn">‹</button>
+              <div class="char-card">
+                <div class="char-preview-wrap small">
+                  <canvas class="char-preview" id="pauseCharPreview" width="96" height="96"></canvas>
+                </div>
+                <div class="char-class" id="pauseCharClassUI">BALANCED</div>
+                <div class="char-name" id="pauseCharNameUI">THE NOBODY</div>
+                <div class="char-desc" id="pauseCharDescUI">A blank slate. Master of nothing — yet.</div>
+                <div class="char-stats" id="pauseCharStatsUI">HP 6 • SPD 1.00x • START POWER 1</div>
+                <div class="char-swatches" id="pauseCharSwatches"></div>
+                <div class="style-swatches" id="styleSwatches"></div>
+              </div>
+              <button class="char-btn" id="pauseCharNextBtn">›</button>
+            </div>
+          </div>
+          <div class="menu-note">Looks update live. Class changes apply next run.</div>
         </div>
       </div>
-      <div class="menu-note">Appearance updates live. Character class changes apply on your next run.</div>
     </div>
-    <div style="margin-top:16px; font-size:10px; color:rgba(255,255,255,0.3); letter-spacing:2px;">ESC TO RESUME</div>
+  </div>
+
+  <!-- How To Play walkthrough (shown once on the first run; skippable; replay from menu) -->
+  <div class="screen hidden" id="howToScreen" data-ui>
+    <div class="howto-card">
+      <div class="howto-step" id="howToStep">1 / 4</div>
+      <div class="howto-icon" id="howToIcon">🏃</div>
+      <div class="howto-title" id="howToTitle">MOVE</div>
+      <div class="howto-body" id="howToBody"></div>
+      <div class="howto-dots" id="howToDots"></div>
+      <div class="howto-actions">
+        <button class="howto-btn ghost" id="howToSkip">SKIP</button>
+        <button class="howto-btn ghost" id="howToBack">BACK</button>
+        <button class="howto-btn" id="howToNext">NEXT ›</button>
+      </div>
+      <div class="howto-hint keys-only">← → TO FLIP · ESC TO SKIP</div>
+    </div>
   </div>
 
   <!-- Editor Toolbar -->
@@ -635,23 +852,29 @@
     <button class="ed-btn" onclick="toggleEditor()">EXIT[ESC]</button>
   </div>
 
-  <!-- Mobile Controls -->
+  </div><!-- /#ui -->
+</div>
+
+<!-- Touch controls live outside the game box (fixed to the real screen edges) -->
+<div id="touchUI">
+  <!-- BUTTONS mode -->
   <div id="mobileControls">
-    <div class="dpad">
-      <div></div>
-      <div class="mbtn" id="mUp">↑</div>
-      <div></div>
-      <div class="mbtn" id="mLeft">←</div>
-      <div class="mbtn" id="mDown">↓</div>
-      <div class="mbtn" id="mRight">→</div>
+    <div class="dpad" data-ui>
+      <div class="mbtn" id="mLeft" data-key="left">◀</div>
+      <div class="mbtn" id="mRight" data-key="right">▶</div>
     </div>
-    <div class="action-btns">
-      <div class="mbtn action" id="mDash">DSH</div>
-      <div class="mbtn action" id="mAtk">ATK</div>
-      <div class="mbtn action" id="mJump">JMP</div>
+    <div class="action-btns" data-ui>
+      <div class="mbtn action atk-btn" id="mAtk" data-key="atk">ATK</div>
+      <div class="mbtn action" id="mDash" data-key="dash">DSH</div>
+      <div class="mbtn action jump" id="mJump" data-key="up">JMP</div>
     </div>
   </div>
+  <!-- TAP + TILT modes: one attack button, shown once you've unlocked an attack -->
+  <div class="mbtn action atk-btn" id="tAtk" data-key="atk" data-ui>ATK</div>
+  <div id="tiltMeter"><div id="tiltDot"></div></div>
+  <div id="zoneHint"></div>
 </div>
+<div id="rotateHint"><div class="rot-icon">📱↻</div><div>TURN YOUR PHONE SIDEWAYS</div><div class="rot-sub">AWAKENED plays in landscape</div></div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -665,9 +888,27 @@ document.addEventListener('DOMContentLoaded', () => {
 // ─────────────────────────────────────────────
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
+// The game world is always 420 units tall. Its WIDTH follows the screen shape
+// (560 on a 4:3 iPad … ~920 on a long phone), so the game fills the whole screen
+// with no black bars, and nothing gets stretched.
 const NATIVE_W = 700, NATIVE_H = 420;
-canvas.width = NATIVE_W; canvas.height = NATIVE_H;
-const W = NATIVE_W, H = NATIVE_H;
+const MIN_ASPECT = 4 / 3, MAX_ASPECT = 2.2;
+let W = NATIVE_W;
+const H = NATIVE_H;
+let renderScale = 1;      // canvas pixels per game unit (drawn at full screen resolution — crisp, no shimmer)
+// Phones/tablets (finger instead of mouse). Drives touch controls and tap-vs-key wording.
+const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
+
+// shadowBlur is measured in screen pixels and ignores ctx.scale(), so scale it ourselves
+// to keep glows looking the same at any resolution.
+(function scaleShadowBlur() {
+  const d = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'shadowBlur');
+  if (!d || !d.set) return;
+  Object.defineProperty(ctx, 'shadowBlur', {
+    get() { return d.get.call(this) / renderScale; },
+    set(v) { d.set.call(this, v * renderScale); },
+  });
+})();
 
 // ─────────────────────────────────────────────
 //  FULLSCREEN + RESPONSIVE SIZING
@@ -676,11 +917,25 @@ const wrapper = document.getElementById('gameWrapper');
 
 function fitGame() {
   const vw = window.innerWidth, vh = window.innerHeight;
-  const scale = Math.min(vw / NATIVE_W, vh / NATIVE_H);
-  const gw = Math.floor(NATIVE_W * scale);
-  const gh = Math.floor(NATIVE_H * scale);
-  wrapper.style.width  = gw + 'px';
-  wrapper.style.height = gh + 'px';
+  const aspect = Math.max(MIN_ASPECT, Math.min(MAX_ASPECT, vw / vh));
+  W = Math.round(H * aspect);
+  // biggest box of that shape that fits the window (= the whole window unless it's extremely wide/tall)
+  const cssH = Math.min(vh, vw / aspect);
+  const cssW = cssH * aspect;
+  wrapper.style.width  = cssW + 'px';
+  wrapper.style.height = cssH + 'px';
+  // draw at the real screen resolution (capped so big monitors don't get slow)
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let bh = Math.round(cssH * dpr);
+  const maxPixels = 3200000;
+  if (bh * bh * aspect > maxPixels) bh = Math.round(Math.sqrt(maxPixels / aspect));
+  renderScale = bh / H;
+  canvas.width = Math.round(W * renderScale);
+  canvas.height = bh;
+  ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+  // menus/HUD are laid out in game units too and scaled to match
+  const ui = document.getElementById('ui');
+  if (ui) { ui.style.width = W + 'px'; ui.style.transform = `scale(${cssH / H})`; ui.classList.toggle('narrow', W < 660); }
 }
 fitGame();
 window.addEventListener('resize', () => { fitGame(); sizeConfettiCanvas?.(); });
@@ -836,7 +1091,7 @@ let platforms=[], enemies=[], projectiles=[], particles=[], fruits=[], healthPac
 const FRUIT_TYPES = ['apple','banana','strawberry','orange'];
 const SPECIAL_FRUIT_TYPES = ['donut','speed_donut'];
 let platformEnd = 0;
-let stars = Array.from({length:80}, ()=>({ x:Math.random()*W, y:Math.random()*H*0.6, r:Math.random()*1.5+0.3, twinkle:Math.random()*Math.PI*2 }));
+let stars = Array.from({length:110}, ()=>({ x:Math.random()*MAX_ASPECT*H, y:Math.random()*H*0.6, r:Math.random()*1.5+0.3, twinkle:Math.random()*Math.PI*2 }));
 
 function normalizePlatform(p) {
   return {
@@ -1316,7 +1571,21 @@ function updateMissionUI() {
     const count = g.target > 1 ? ` ${g.current}/${g.target}` : '';
     return `<div class="mission-row${g.done ? ' done' : ''}">${prefix} ${g.label}${count}</div>`;
   }).join('');
+  const done = keys.filter(k => levelGoals[k].done).length;
+  const box = document.getElementById('missionBox');
+  const collapsed = box && box.classList.contains('collapsed');
+  document.getElementById('missionTitle').textContent = `OBJECTIVES ${done}/${keys.length} ${collapsed ? '▸' : '▾'}`;
 }
+// Tap the OBJECTIVES title to fold the list away (starts folded on phones so it doesn't cover the level)
+(function setupMissionToggle() {
+  const box = document.getElementById('missionBox');
+  if (isTouchDevice) box.classList.add('collapsed');
+  document.getElementById('missionTitle').addEventListener('click', e => {
+    e.stopPropagation();
+    box.classList.toggle('collapsed');
+    updateMissionUI();
+  });
+})();
 
 function applyCharacterLoadout(fullHeal=false) {
   const available = getSelectableCharacters();
@@ -1651,8 +1920,8 @@ function findPlatformAt(wx, wy) {
 // Editor mouse handlers (attached below)
 function screenToWorld(e) {
   const rect = wrapper.getBoundingClientRect();
-  const sx = NATIVE_W / wrapper.offsetWidth;
-  const sy = NATIVE_H / wrapper.offsetHeight;
+  const sx = W / rect.width;
+  const sy = H / rect.height;
   return { x: (e.clientX - rect.left) * sx + scrollX,
            y: (e.clientY - rect.top)  * sy };
 }
@@ -1664,6 +1933,13 @@ const keys = {};
 const mobileKeys = {};
 document.addEventListener('keydown', e => {
   if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  if (!document.getElementById('howToScreen').classList.contains('hidden')) {
+    if (['ArrowRight','Enter','Space','KeyD'].includes(e.code)) howToStep(1);
+    else if (['ArrowLeft','KeyA'].includes(e.code)) howToStep(-1);
+    else if (e.code === 'Escape') closeHowTo();
+    e.preventDefault();
+    return;                      // don't let these keys leak into the game/menus
+  }
   keys[e.code] = true;
   if (state === 'start' && !e.metaKey && !e.ctrlKey && !e.altKey) handleArchitectCodeInput(e.key);
   if (state === 'intro' && ['Space','Enter','Escape','KeyZ','KeyX'].includes(e.code)) {
@@ -1697,20 +1973,307 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.code]=false; });
 
-function bindMobileBtn(id, keyName) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.addEventListener('touchstart', e=>{ e.preventDefault(); mobileKeys[keyName]=true; }, {passive:false});
-  el.addEventListener('touchend',   e=>{ e.preventDefault(); mobileKeys[keyName]=false; }, {passive:false});
-  el.addEventListener('mousedown',  e=>{ mobileKeys[keyName]=true; });
-  el.addEventListener('mouseup',    e=>{ mobileKeys[keyName]=false; });
+// ─────────────────────────────────────────────
+//  TOUCH CONTROLS (phones / tablets)
+//  Three styles, picked on the start screen or in the pause menu:
+//   • tap (default) — HOLD the left half = run left, HOLD the right half = run right.
+//                     DOUBLE-TAP = jump (double-tap again in the air = double jump).
+//                     Keep holding the second tap to keep "jump" held (flying).
+//                     Swipe ← / → = dash. Swipe ↑ = jump too.
+//   • tilt          — tilt the phone to run, TAP anywhere = jump, swipe ← / → = dash.
+//   • buttons       — classic ◀ ▶ + JMP / DSH / ATK buttons.
+//  In tap + tilt, one ATK button appears bottom-right once you unlock an attack.
+// ─────────────────────────────────────────────
+const CONTROL_MODES = ['tap', 'tilt', 'buttons'];
+let controlMode = 'keys';
+if (isTouchDevice) {
+  let saved = null;
+  try { saved = localStorage.getItem('awakened_controls'); } catch (_) {}
+  controlMode = CONTROL_MODES.includes(saved) ? saved : 'tap';
 }
-bindMobileBtn('mLeft','left'); bindMobileBtn('mRight','right');
-bindMobileBtn('mUp','up'); bindMobileBtn('mJump','up');
-bindMobileBtn('mAtk','atk'); bindMobileBtn('mDash','dash');
+let tiltInvert = false;
+try { tiltInvert = localStorage.getItem('awakened_tilt_invert') === '1'; } catch (_) {}
 
-document.getElementById('startScreen').addEventListener('click', ()=>{ if(state==='start') startGame(); });
-document.getElementById('deathScreen').addEventListener('click', ()=>{ if(state==='dead')  startGame(); });
+const zoneKeys = { up:false };              // "jump" held by a touch (for flying / holding a jump)
+const touchLatch = { up:0, atk:0, dash:0, dashDir:0 }; // short taps/swipes survive until update() sees them
+let touchAxis = 0;                           // -1..1 run direction from tap zones or tilt
+
+function setControlMode(mode, persist = true) {
+  if (!CONTROL_MODES.includes(mode)) return;
+  controlMode = mode;
+  if (persist) { try { localStorage.setItem('awakened_controls', mode); } catch (_) {} }
+  clearAllInput();
+  if (mode === 'tilt') startTilt();           // called from a tap, so iOS can show its permission prompt
+  syncControlUI();
+}
+
+function syncControlUI() {
+  const b = document.body;
+  b.classList.toggle('touch', isTouchDevice);
+  CONTROL_MODES.forEach(m => b.classList.toggle('ctl-' + m, isTouchDevice && controlMode === m));
+  document.querySelectorAll('[data-ctl]').forEach(btn => btn.classList.toggle('active', btn.dataset.ctl === controlMode));
+  document.querySelectorAll('.tilt-only').forEach(el => el.style.display = controlMode === 'tilt' ? '' : 'none');
+  const inv = document.getElementById('tiltInvertBtn');
+  if (inv) inv.textContent = tiltInvert ? '⇆ TILT: INVERTED' : '⇆ TILT: NORMAL';
+  renderControlHelp();
+}
+
+// Short label for an action in the player's current control scheme (used by tutorials/help).
+function ctl(action) {
+  const t = isTouchDevice ? controlMode : 'keys';
+  const L = {
+    keys:    { move:'← → / A D', jump:'Space / W', attack:'Z / X', dash:'Shift + ← →', pause:'Esc / M' },
+    tap:     { move:'Hold left / right side', jump:'Double-tap', attack:'ATK button', dash:'Swipe ← →', pause:'MENU button' },
+    tilt:    { move:'Tilt phone', jump:'Tap screen', attack:'ATK button', dash:'Swipe ← →', pause:'MENU button' },
+    buttons: { move:'◀ ▶ buttons', jump:'JMP button', attack:'ATK button', dash:'DSH + ◀ ▶', pause:'MENU button' },
+  };
+  return (L[t] || L.keys)[action] || action;
+}
+
+function renderControlHelp() {
+  const grid = document.getElementById('controlsGrid');
+  if (!grid) return;
+  const rows = [
+    ['move', 'Move'], ['jump', 'Jump · again in air = double'],
+    ['attack', 'Attack (lv 2)'], ['dash', 'Dash (lv 3)'],
+  ];
+  let html = rows.map(([a, label]) => `<div class="ctrl"><b>${ctl(a)}</b> ${label}</div>`).join('');
+  if (!isTouchDevice) html += '<div class="ctrl"><b>Tab</b> Co-op · <b>P2</b> I J K L + U O</div>';
+  grid.innerHTML = html;
+  const startCta = document.querySelector('#startScreen .cta');
+  if (startCta) startCta.textContent = ctaText('BEGIN');
+}
+function ctaText(rest) { return `${isTouchDevice ? 'TAP' : 'PRESS SPACE'} TO ${rest}`; }
+
+// ---------- tilt ----------
+let tiltListening = false, tiltNeutral = null, tiltSmooth = 0, tiltLastEvent = 0, tiltCheckTimer = null;
+function screenAngle() {
+  const a = (screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : (window.orientation || 0);
+  return ((a % 360) + 360) % 360;
+}
+function onDeviceOrientation(e) {
+  if (e.beta == null || e.gamma == null) return;
+  tiltLastEvent = performance.now();
+  // gravity direction in device coordinates, from beta/gamma
+  const b = e.beta * Math.PI / 180, g = e.gamma * Math.PI / 180;
+  const gx = Math.cos(b) * Math.sin(g), gy = -Math.sin(b);
+  // how much gravity points toward the RIGHT edge of the screen as the player sees it
+  const a = screenAngle();
+  const s = a === 90 ? -gy : a === 270 ? gy : a === 180 ? -gx : gx;
+  const deg = Math.asin(Math.max(-1, Math.min(1, s))) * 180 / Math.PI;
+  if (tiltNeutral === null) tiltNeutral = deg;   // calibrate: however they hold it = standing still
+  let d = deg - tiltNeutral;
+  if (tiltInvert) d = -d;
+  const DEAD = 3, FULL = 16;                      // degrees
+  const target = Math.abs(d) < DEAD ? 0 : Math.sign(d) * Math.min(1, (Math.abs(d) - DEAD) / (FULL - DEAD));
+  tiltSmooth += (target - tiltSmooth) * 0.5;
+  if (target === 0 && Math.abs(tiltSmooth) < 0.06) tiltSmooth = 0;
+  if (controlMode === 'tilt') touchAxis = tiltSmooth;
+  const dot = document.getElementById('tiltDot');
+  if (dot) dot.style.left = (50 + tiltSmooth * 46) + '%';
+}
+function requestTiltPermission() {
+  // iPhone/iPad: must be called straight from a tap, and the player has to press "Allow"
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    return DeviceOrientationEvent.requestPermission().then(r => r === 'granted').catch(() => false);
+  }
+  return Promise.resolve(typeof DeviceOrientationEvent !== 'undefined');
+}
+function startTilt() {
+  if (!isTouchDevice) return;
+  requestTiltPermission().then(ok => {
+    if (!tiltListening) { window.addEventListener('deviceorientation', onDeviceOrientation); tiltListening = true; }
+    recenterTilt();
+    clearTimeout(tiltCheckTimer);
+    // Only give up on tilt if the sensor really isn't sending anything
+    tiltCheckTimer = setTimeout(() => {
+      if (controlMode === 'tilt' && performance.now() - tiltLastEvent > 1500)
+        fallbackToTap(ok ? 'NO TILT SENSOR — USING TAP CONTROLS' : 'TILT NOT ALLOWED — USING TAP CONTROLS');
+    }, 1800);
+  });
+}
+function recenterTilt() { tiltNeutral = null; tiltSmooth = 0; if (controlMode === 'tilt') touchAxis = 0; }
+function recenterTiltFromMenu() { recenterTilt(); showToast('TILT CENTERED'); }
+function toggleTiltInvert() {
+  tiltInvert = !tiltInvert;
+  try { localStorage.setItem('awakened_tilt_invert', tiltInvert ? '1' : '0'); } catch (_) {}
+  recenterTilt(); syncControlUI();
+}
+function fallbackToTap(msg) {
+  if (controlMode !== 'tilt') return;
+  setControlMode('tap', false);
+  showToast(msg);
+}
+screen.orientation?.addEventListener('change', recenterTilt);
+
+// ---------- on-screen buttons (BUTTONS mode + the ATK button) ----------
+// A finger can slide from one button to another (◀ to ▶) and it follows.
+const btnPointers = new Map();   // pointerId -> key name or null
+function keyUnder(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const b = el && el.closest ? el.closest('[data-key]') : null;
+  return b && b.offsetParent !== null ? b.dataset.key : null;
+}
+function refreshBtnKeys() {
+  const before = { ...mobileKeys };
+  ['left','right','up','atk','dash'].forEach(k => mobileKeys[k] = false);
+  btnPointers.forEach(k => { if (k) mobileKeys[k] = true; });
+  // a press that starts and ends between two updates still counts
+  if (mobileKeys.up && !before.up) touchLatch.up = 2;
+  if (mobileKeys.atk && !before.atk) touchLatch.atk = 2;
+  if (mobileKeys.dash && !before.dash) touchLatch.dash = 3;
+  document.querySelectorAll('[data-key]').forEach(el => el.classList.toggle('pressed', !!mobileKeys[el.dataset.key]));
+}
+
+// ---------- touch zones (TAP + TILT modes) ----------
+// TAP mode rules (designed so you can jump in place AND jump while running):
+//  • Press and HOLD a side → after a split second you run that way. A quick tap doesn't move you.
+//  • Two quick taps (double-tap) → jump straight up, right where you are.
+//  • While one finger is holding (running), ANY tap with your other thumb → jump.
+//    You keep running in the same direction — the extra tap never steers.
+//  • Keep the jump finger down → keeps "jump" held (higher fly with donut wings).
+const zonePointers = new Map();  // pointerId -> { side, x0, y0, t0, swiped, jumpHold, role, moving, order }
+let zoneOrder = 0;
+let lastTapUp = -1e9;            // when the last quick tap was released
+const DOUBLE_TAP_MS = 300, QUICK_TAP_MS = 200, RUN_DELAY_MS = 110, SWIPE_PX = 40, SWIPE_MS = 260;
+function zonesActive() { return isTouchDevice && state === 'play' && (controlMode === 'tap' || controlMode === 'tilt'); }
+function triggerJump(z) {
+  touchLatch.up = 2;
+  if (z) z.jumpHold = true;
+  hapticPulse(8);
+}
+function refreshZones() {
+  if (controlMode === 'tap') {
+    // the newest finger that is actually running decides the direction
+    let runner = null;
+    zonePointers.forEach(z => { if (z.role === 'run' && z.moving && (!runner || z.order > runner.order)) runner = z; });
+    touchAxis = runner ? (runner.side === 'L' ? -1 : 1) : 0;
+  }
+  zoneKeys.up = [...zonePointers.values()].some(z => z.jumpHold);
+}
+// called every game update: a held finger starts running once it's clearly a hold, not a tap
+function updateZoneHolds() {
+  if (controlMode !== 'tap' || zonePointers.size === 0) return;
+  const now = performance.now();
+  let changed = false;
+  zonePointers.forEach(z => {
+    if (z.role === 'run' && !z.moving && now - z.t0 >= RUN_DELAY_MS) { z.moving = true; changed = true; }
+    // second tap of a double-tap held down → after the jump, keep running that way
+    if (z.role === 'jump' && z.fromDoubleTap && now - z.t0 >= QUICK_TAP_MS) { z.role = 'run'; z.moving = true; changed = true; }
+  });
+  if (changed) refreshZones();
+}
+
+const UI_SELECTOR = 'button, input, a, .menu-btn, #missionBox, [data-ui], .screen:not(.hidden)';
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+  const target = e.target;
+  if (target.closest && target.closest('[data-key]')) {
+    e.preventDefault();
+    btnPointers.set(e.pointerId, target.closest('[data-key]').dataset.key);
+    try { target.releasePointerCapture?.(e.pointerId); } catch (_) {}
+    refreshBtnKeys();
+    return;
+  }
+  if (!zonesActive() || (target.closest && target.closest(UI_SELECTOR))) return;
+  e.preventDefault();
+  const now = performance.now();
+  const z = { side: e.clientX < window.innerWidth / 2 ? 'L' : 'R', x0: e.clientX, y0: e.clientY, t0: now,
+              swiped: false, jumpHold: false, role: 'run', moving: false, fromDoubleTap: false, order: ++zoneOrder };
+  if (controlMode === 'tilt') {
+    z.role = 'jump'; triggerJump(z);                   // tilt: any tap = jump
+  } else if ([...zonePointers.values()].some(o => o.role === 'run')) {
+    z.role = 'jump'; triggerJump(z);                   // other thumb taps while running = jump
+  } else if (now - lastTapUp < DOUBLE_TAP_MS) {
+    z.role = 'jump'; z.fromDoubleTap = true; triggerJump(z);   // double-tap = jump in place
+    lastTapUp = -1e9;
+  }
+  zonePointers.set(e.pointerId, z);
+  refreshZones();
+}, { passive: false });
+
+document.addEventListener('pointermove', e => {
+  if (btnPointers.has(e.pointerId)) {
+    const k = keyUnder(e.clientX, e.clientY);
+    if (k !== btnPointers.get(e.pointerId)) { btnPointers.set(e.pointerId, k); refreshBtnKeys(); }
+    return;
+  }
+  const z = zonePointers.get(e.pointerId);
+  if (!z || z.swiped || performance.now() - z.t0 > SWIPE_MS) return;
+  const dx = e.clientX - z.x0, dy = e.clientY - z.y0;
+  if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy) * 1.3) {
+    z.swiped = true;                                   // quick sideways swipe = dash that way
+    touchLatch.dash = 3; touchLatch.dashDir = Math.sign(dx);
+    z.side = dx < 0 ? 'L' : 'R';                       // and keep running the way you swiped
+    if (z.role === 'run') z.moving = true;
+    refreshZones();
+  } else if (controlMode === 'tap' && -dy > SWIPE_PX && -dy > Math.abs(dx) * 1.3) {
+    z.swiped = true;                                   // quick upward swipe = jump (no double-tap needed)
+    triggerJump(z);
+    refreshZones();
+  }
+}, { passive: true });
+
+function endPointer(e) {
+  if (btnPointers.delete(e.pointerId)) { refreshBtnKeys(); return; }
+  const z = zonePointers.get(e.pointerId);
+  if (!z) return;
+  zonePointers.delete(e.pointerId);
+  // a quick tap that didn't move you counts as the first half of a double-tap
+  if (z.role === 'run' && !z.swiped && performance.now() - z.t0 < QUICK_TAP_MS) lastTapUp = performance.now();
+  refreshZones();
+}
+document.addEventListener('pointerup', endPointer);
+document.addEventListener('pointercancel', endPointer);   // e.g. a notification steals the touch
+document.addEventListener('contextmenu', e => { if (isTouchDevice) e.preventDefault(); });
+
+function clearAllInput() {
+  Object.keys(keys).forEach(k => keys[k] = false);
+  Object.keys(mobileKeys).forEach(k => mobileKeys[k] = false);
+  btnPointers.clear(); zonePointers.clear();
+  zoneKeys.up = false;
+  touchLatch.up = touchLatch.atk = touchLatch.dash = touchLatch.dashDir = 0;
+  lastTapUp = -1e9;
+  if (controlMode !== 'tilt') touchAxis = 0;
+  document.querySelectorAll('[data-key].pressed').forEach(el => el.classList.remove('pressed'));
+}
+// Releasing keys while the window isn't focused never reaches us — so clear on blur,
+// and pause when the tab/app goes to the background.
+window.addEventListener('blur', clearAllInput);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { clearAllInput(); if (state === 'play') pauseGame(); }
+});
+// Phone turned to portrait mid-game → pause (the rotate hint covers the screen)
+const portraitQuery = window.matchMedia('(orientation: portrait)');
+function onPortraitChange() { if (isTouchDevice && portraitQuery.matches && state === 'play') pauseGame(); }
+portraitQuery.addEventListener ? portraitQuery.addEventListener('change', onPortraitChange) : portraitQuery.addListener(onPortraitChange);
+
+function tickTouchLatches() {
+  updateZoneHolds();
+  if (touchLatch.up > 0) touchLatch.up--;
+  if (touchLatch.atk > 0) touchLatch.atk--;
+  if (touchLatch.dash > 0) touchLatch.dash--; else touchLatch.dashDir = 0;
+}
+
+// Things a tap on the start/death screen should do on phones before the run begins.
+function prepareTouchRun() {
+  if (!isTouchDevice) return;
+  if (controlMode === 'tilt') startTilt(); else recenterTilt();
+  // Android: go fullscreen + lock landscape (iPhone Safari doesn't allow this; "Add to Home Screen" does)
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen) {
+    el.requestFullscreen().then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+  }
+}
+
+document.querySelectorAll('[data-ctl]').forEach(btn => btn.addEventListener('click', e => {
+  e.stopPropagation(); setControlMode(btn.dataset.ctl);
+}));
+document.querySelectorAll('.ctl-picker').forEach(el => el.addEventListener('click', e => e.stopPropagation()));
+syncControlUI();
+
+document.getElementById('startScreen').addEventListener('click', ()=>{ if(state==='start') { prepareTouchRun(); startGame(); } });
+document.getElementById('deathScreen').addEventListener('click', ()=>{ if(state==='dead') { prepareTouchRun(); startGame(); } });
 document.querySelector('#startScreen .char-select').addEventListener('click', e => e.stopPropagation());
 document.getElementById('charPrevBtn').addEventListener('click', e => { e.stopPropagation(); cycleCharacter(-1); });
 document.getElementById('charNextBtn').addEventListener('click', e => { e.stopPropagation(); cycleCharacter(1); });
@@ -1722,11 +2285,19 @@ document.getElementById('menuHubBtn').addEventListener('click', () => {
 });
 wrapper.addEventListener('pointerdown', () => { if (state === 'intro') trySkipWakeIntro(); });
 
-function isLeft()  { return keys['ArrowLeft']||keys['KeyA']||mobileKeys['left']; }
-function isRight() { return keys['ArrowRight']||keys['KeyD']||mobileKeys['right']; }
-function isUp()    { return keys['ArrowUp']||keys['KeyW']||keys['Space']||mobileKeys['up']; }
-function isDash()  { return keys['ShiftLeft']||keys['ShiftRight']||mobileKeys['dash']; }
-function isAtk()   { return keys['KeyZ']||keys['KeyX']||mobileKeys['atk']; }
+function digitalLeft()  { return !!(keys['ArrowLeft']||keys['KeyA']||mobileKeys['left']); }
+function digitalRight() { return !!(keys['ArrowRight']||keys['KeyD']||mobileKeys['right']); }
+function isLeft()  { return digitalLeft()  || touchAxis < 0 || (touchLatch.dash > 0 && touchLatch.dashDir < 0); }
+function isRight() { return digitalRight() || touchAxis > 0 || (touchLatch.dash > 0 && touchLatch.dashDir > 0); }
+function isUp()    { return !!(keys['ArrowUp']||keys['KeyW']||keys['Space']||mobileKeys['up']||zoneKeys.up||touchLatch.up > 0); }
+function isDash()  { return !!(keys['ShiftLeft']||keys['ShiftRight']||mobileKeys['dash']||touchLatch.dash > 0); }
+function isAtk()   { return !!(keys['KeyZ']||keys['KeyX']||mobileKeys['atk']||touchLatch.atk > 0); }
+// -1..1 run direction. Keys/buttons are all-or-nothing; tilt is analog (gentle tilt = walk).
+function moveAxis() {
+  const l = digitalLeft(), r = digitalRight();
+  if (l || r) return r ? 1 : -1;            // same as before: right wins if both are held
+  return touchAxis;
+}
 
 function startWakeIntro() {
   introTimer = 0;
@@ -1749,8 +2320,100 @@ function finishWakeIntro(skipped=false) {
   document.getElementById('menuHubBtn').classList.add('show');
   startMusic();
   if (skipped) showToast('INTRO SKIPPED');
-  setTimeout(()=>showTutorial(WALL_JUMP_TUT), 2200);
+  if (!howToSeen()) openHowTo(true);       // first run: quick, skippable walkthrough
+  else afterHowTo();
 }
+
+// ─────────────────────────────────────────────
+//  HOW TO PLAY walkthrough
+//  Shown once (first run), skippable at any time, replayable from the
+//  start screen or pause menu. Text adapts to keyboard / tap / tilt / buttons.
+// ─────────────────────────────────────────────
+let howToPage = 0, howToFromRunStart = false, howToReturnState = 'play';
+function howToSeen() { try { return localStorage.getItem('awakened_howto_seen') === '1'; } catch (_) { return true; } }
+function howToPages() {
+  const tilt = isTouchDevice && controlMode === 'tilt';
+  const tap = isTouchDevice && controlMode === 'tap';
+  return [
+    { icon:'🏃', title:'MOVE', rows: [
+      tap  ? 'Hold the <b>left side</b> of the screen to run left, the <b>right side</b> to run right'
+           : `<b>${ctl('move')}</b> to run`,
+      tilt ? 'Hold the phone however feels comfy — that angle counts as "standing still". Tilt a little to walk, more to sprint.'
+           : 'Your score only climbs while you keep moving — so keep going!',
+      tilt ? 'Tilt feels off? Pause → <b>RE-CENTER</b>, or switch to <b>TAP</b>.' : '' ] },
+    { icon:'⤴', title:'JUMP', rows: [
+      tap  ? '<b>Double-tap</b> to jump — keep your finger down on the 2nd tap to keep running that way (or <b>swipe up</b>)'
+           : `<b>${ctl('jump')}</b> to jump`,
+      tap  ? '<b>Double-tap again</b> in midair for a <b>double jump</b>' : 'Jump again in midair for a <b>double jump</b>',
+      'Jump into a wall, then jump again to <b>wall jump</b> off it',
+      'Land on enemies\' heads to <b>stomp</b> them' ] },
+    { icon:'⚡', title:'GET STRONGER', rows: [
+      'Your score unlocks new powers:',
+      '<b>350</b> Punch · <b>700</b> Dash + Shots',
+      '<b>1050</b> Wall climb · <b>1400</b> Burst attack',
+      `Attack: <b>${ctl('attack')}</b> · Dash: <b>${ctl('dash')}</b>` ] },
+    { icon:'🎯', title:'YOUR GOAL', rows: [
+      'Finish the <b>OBJECTIVES</b> in the top-left corner',
+      'Grab fruit, touch checkpoints, beat the boss',
+      'Then board the door to the next world',
+      `Pause anytime: <b>${ctl('pause')}</b> — this guide is in the menu` ] },
+  ];
+}
+function renderHowTo() {
+  const pages = howToPages();
+  const p = pages[howToPage];
+  document.getElementById('howToStep').textContent = `${howToPage + 1} / ${pages.length}`;
+  document.getElementById('howToIcon').textContent = p.icon;
+  document.getElementById('howToTitle').textContent = p.title;
+  document.getElementById('howToBody').innerHTML = p.rows.filter(Boolean).map(r => `<div class="tut-row">${r}</div>`).join('');
+  document.getElementById('howToDots').innerHTML = pages.map((_, i) => `<i class="${i === howToPage ? 'on' : ''}"></i>`).join('');
+  document.getElementById('howToBack').disabled = howToPage === 0;
+  document.getElementById('howToNext').textContent = howToPage === pages.length - 1 ? "LET'S GO ›" : 'NEXT ›';
+}
+function openHowTo(fromRunStart) {
+  howToFromRunStart = fromRunStart;
+  howToReturnState = state;
+  howToPage = 0;
+  if (state === 'play') { state = 'howto'; clearAllInput(); }
+  document.getElementById('pauseScreen').classList.add('hidden');
+  document.getElementById('howToScreen').classList.remove('hidden');
+  renderHowTo();
+}
+function closeHowTo() {
+  try { localStorage.setItem('awakened_howto_seen', '1'); } catch (_) {}
+  document.getElementById('howToScreen').classList.add('hidden');
+  clearAllInput();
+  if (howToReturnState === 'paused') {
+    document.getElementById('pauseScreen').classList.remove('hidden');
+  } else if (howToReturnState === 'play') {
+    state = 'play';
+    recenterTilt();
+  }
+  if (howToFromRunStart) afterHowTo();
+}
+function howToStep(dir) {
+  const n = howToPages().length;
+  howToPage += dir;
+  if (howToPage >= n) { closeHowTo(); return; }
+  howToPage = Math.max(0, howToPage);
+  renderHowTo();
+}
+// Runs once the player is actually in control at the start of a run.
+function afterHowTo() {
+  if (isTouchDevice && (controlMode === 'tap' || controlMode === 'tilt')) {
+    const hint = document.getElementById('zoneHint');
+    hint.innerHTML = controlMode === 'tap'
+      ? '<div class="zone l">◀ HOLD<br>RUN LEFT</div><div class="zone r">HOLD ▶<br>RUN RIGHT</div><div class="mid">DOUBLE-TAP = JUMP · SWIPE = DASH</div>'
+      : '<div class="zone all">TILT TO RUN<br>TAP ANYWHERE TO JUMP<br>SWIPE ← → TO DASH</div>';
+    hint.classList.add('show');
+    setTimeout(() => hint.classList.remove('show'), 3000);
+  }
+  setTimeout(()=>{ if (state === 'play') showTutorial(wallJumpTut()); }, 2200);
+}
+document.getElementById('howToNext').addEventListener('click', e => { e.stopPropagation(); howToStep(1); });
+document.getElementById('howToBack').addEventListener('click', e => { e.stopPropagation(); howToStep(-1); });
+document.getElementById('howToSkip').addEventListener('click', e => { e.stopPropagation(); closeHowTo(); });
+document.getElementById('startHowToBtn').addEventListener('click', e => { e.stopPropagation(); openHowTo(false); });
 
 function trySkipWakeIntro() {
   if (state !== 'intro') return false;
@@ -1795,13 +2458,17 @@ function quitToMenu() {
 
 function pauseGame() {
   state = 'paused';
+  clearAllInput();
   audioCtx.suspend();
   document.getElementById('pauseScreen').classList.remove('hidden');
   updateCharacterSelectUI();
 }
 
 function resumeGame() {
+  if (isTouchDevice && portraitQuery.matches) return;   // stay paused until the phone is turned sideways
   state = 'play';
+  clearAllInput();
+  recenterTilt();
   audioCtx.resume();
   document.getElementById('pauseScreen').classList.add('hidden');
 }
@@ -1849,7 +2516,7 @@ function showDeathFinal() {
   const titleEl = document.querySelector('#deathScreen .screen-title');
   const ctaEl = document.querySelector('#deathScreen .cta');
   if (titleEl) titleEl.textContent = 'YOU LOST';
-  if (ctaEl) ctaEl.textContent = 'PRESS SPACE TO TRY AGAIN';
+  if (ctaEl) ctaEl.textContent = ctaText('TRY AGAIN');
   const isNew = score > 0 && leaderboard.length > 0 && leaderboard[0].score === score;
   document.getElementById('deathScoreUI').textContent = score;
   document.getElementById('newBestUI').classList.toggle('hidden', !isNew);
@@ -1867,7 +2534,7 @@ function showVictoryFinal() {
   const titleEl = document.querySelector('#deathScreen .screen-title');
   const ctaEl = document.querySelector('#deathScreen .cta');
   if (titleEl) titleEl.textContent = 'YOU ASCENDED';
-  if (ctaEl) ctaEl.textContent = 'PRESS SPACE TO RUN AGAIN';
+  if (ctaEl) ctaEl.textContent = ctaText('RUN AGAIN');
   document.getElementById('deathScoreUI').textContent = score;
   document.getElementById('newBestUI').classList.remove('hidden');
   document.getElementById('newBestUI').textContent = 'RUN COMPLETE!';
@@ -1925,14 +2592,17 @@ function showToast(msg) {
   toastTimeout = setTimeout(()=>{ t.classList.remove('show'); unlockAlpha=0; }, 2400);
 }
 
+// Power-up tutorials. Built on demand so the button names match the player's controls.
 const TUTORIALS = {
-  2: { title:'PUNCH UNLOCKED', rows:['<b>Z / X</b> — Punch nearby enemies'] },
-  3: { title:'DASH + SHOOT UNLOCKED', rows:['<b>Shift + ← →</b> — Dash through enemies','<b>Z / X</b> — Fire ranged shot'] },
-  4: { title:'WALL CLIMB UNLOCKED', rows:['Press against a wall to slow your fall','<b>Space</b> while on wall — Wall jump'] },
-  5: { title:'BURST ATTACK UNLOCKED', rows:['<b>Z / X</b> — 8-direction energy burst','Destroys all nearby enemies at once!'] },
+  2: () => ({ title:'PUNCH UNLOCKED', rows:[`<b>${ctl('attack')}</b> — Punch nearby enemies`] }),
+  3: () => ({ title:'DASH + SHOOT UNLOCKED', rows:[`<b>${ctl('dash')}</b> — Dash through enemies`,`<b>${ctl('attack')}</b> — Fire ranged shot`] }),
+  4: () => ({ title:'WALL CLIMB UNLOCKED', rows:['Press against a wall to slow your fall',`<b>${ctl('jump')}</b> while on a wall — Wall jump`] }),
+  5: () => ({ title:'BURST ATTACK UNLOCKED', rows:[`<b>${ctl('attack')}</b> — 8-direction energy burst`,'Destroys all nearby enemies at once!'] }),
 };
 // Initial tutorial for wall jump (always available)
-const WALL_JUMP_TUT = { title:'WALL JUMP', rows:['Jump into a wall to grip it','Press <b>Space</b> again to leap off','<b>Space / W</b> — Double jump midair'] };
+function wallJumpTut() {
+  return { title:'WALL JUMP', rows:['Jump into a wall to grip it',`<b>${ctl('jump')}</b> again to leap off`,`<b>${ctl('jump')}</b> in midair — Double jump`] };
+}
 
 let tutTimeout = null;
 function showTutorial(data) {
@@ -2232,11 +2902,14 @@ function stopMusic() {
     musicGain.gain.setValueAtTime(musicGain.gain.value, audioCtx.currentTime);
     musicGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
   }
+  // Hand the OLD nodes to the cleanup. (It used to clean up whatever was current 600ms later —
+  // so stopMusic(); startMusic(); on a level change deleted the NEW track and the music died.)
+  const oldNodes = musicNodes, oldGain = musicGain, oldFilter = musicFilter;
+  musicNodes = []; musicGain = null; musicFilter = null;
   setTimeout(() => {
-    musicNodes.forEach(n => { try { n.stop?.(); n.disconnect?.(); } catch(e){} });
-    musicNodes = [];
-    if (musicGain) { try { musicGain.disconnect(); } catch(e){} musicGain = null; }
-    if (musicFilter) { try { musicFilter.disconnect(); } catch(e){} musicFilter = null; }
+    oldNodes.forEach(n => { try { n.stop?.(); n.disconnect?.(); } catch(e){} });
+    if (oldGain) { try { oldGain.disconnect(); } catch(e){} }
+    if (oldFilter) { try { oldFilter.disconnect(); } catch(e){} }
   }, 600);
 }
 
@@ -2354,7 +3027,7 @@ function update() {
     powerLevel = np; applyPower();
     const msgs = ['','PUNCH UNLOCKED!','DASH + RANGED SHOTS!','WALL CLIMB UNLOCKED!','BURST ATTACK READY!'];
     showToast(msgs[powerLevel-1]||'POWER UP!');
-    if (TUTORIALS[powerLevel]) showTutorial(TUTORIALS[powerLevel]);
+    if (TUTORIALS[powerLevel]) showTutorial(TUTORIALS[powerLevel]());
   }
 
   if (invincibleTimer>0) invincibleTimer--;
@@ -2364,17 +3037,28 @@ function update() {
     p.occupied = false;
     if (p.boostCooldown > 0) p.boostCooldown--;
     if (p.type==='moving') {
-      p.y += p.vy*p.dir;
-      if (p.y<H*0.18||p.y>H-80) p.dir*=-1;
+      // Bounce between a top and bottom limit. (Before: platforms that spawned below
+      // the bottom limit flipped direction EVERY frame and vibrated in place forever.)
+      const top = H * 0.18, bottom = H - 80;
+      const oldY = p.y;
+      p.y += p.vy * p.dir;
+      if (p.y < top)    { p.y = top;    if (p.vy * p.dir < 0) p.dir *= -1; }
+      if (p.y > bottom) { p.y = bottom; if (p.vy * p.dir > 0) p.dir *= -1; }
+      p.lastDy = p.y - oldY;
     } else if (p.type==='shaky') {
       p.standTimer = Math.max(0, (p.standTimer || 0) - 0.4);
     }
   });
+  // ride moving platforms: carry anyone who was standing on one last frame
+  // (otherwise the player gets "dropped" every frame while it moves down)
+  carryOnMovingPlatform(player);
+  if (coopMode && player2) carryOnMovingPlatform(player2);
   itemBoxes.forEach(box => { if (box.bumpTimer > 0) box.bumpTimer--; });
   if (hiddenPuzzle && hiddenPuzzle.resetFlash > 0) hiddenPuzzle.resetFlash--;
 
   // ---- PLAYER INPUT ----
   const left=isLeft(), right=isRight(), up=isUp(), dash=isDash(), atk=isAtk();
+  tickTouchLatches();
   const inWaterVoid = inHiddenLevel && hiddenFromLevel === 3;
   const inLevelOneRiver = !inHiddenLevel && currentLevel === 1;
   if (inWaterVoid) {
@@ -2391,10 +3075,21 @@ function update() {
     if (player.dashTimer<=0){ player.dashing=false; player.vx=0; }
   } else {
     const moveSpeed = SPEED * charSpeedMult * (player.speedDonutTimer > 0 ? 1.45 : 1);
-    player.vx = 0;
-    if (left)  { player.vx=-moveSpeed; player.facing=-1; }
-    if (right) { player.vx= moveSpeed; player.facing= 1; }
+    if (player.wallKickTimer > 0) {
+      // keep the wall-jump push for a few frames instead of letting input erase it
+      player.wallKickTimer--;
+      player.vx *= 0.9;
+    } else {
+      // moveAxis() is -1..1 — analog for tilt, full for keys/tap zones/buttons
+      const axis = moveAxis();
+      player.vx = axis * moveSpeed;
+      if (axis < 0) player.facing = -1;
+      if (axis > 0) player.facing = 1;
+    }
     if (dash && player.canDash && player.dashCooldown<=0 && (left||right)) {
+      if (left && !right) player.facing = -1;
+      if (right && !left) player.facing = 1;
+      player.wallKickTimer = 0;
       player.dashing=true; player.dashTimer=10;
       player.vx=player.facing*moveSpeed*2.9; player.dashCooldown=48;
       spawnParticles(player.x + PW/2, player.y + PH/2, '#a78bfa', 8);
@@ -2415,6 +3110,7 @@ function update() {
       player.vy = JUMP_V * 0.92;
       player.vx = player.wallContactDir * -SPEED * 2.5;
       player.facing = player.wallContactDir * -1;
+      player.wallKickTimer = 12;
       player.usedDouble = false;
       player.wallContact = false;
       spawnParticles(player.x + PW/2, player.y + PH/2, '#34d399', 7);
@@ -2447,18 +3143,21 @@ function update() {
   // gravity & move
   player.vy += (player.flyTimer !== 0 ? GRAVITY * 0.22 : GRAVITY) * (inWaterVoid ? 0.34 : 1);
   if (player.flyTimer !== 0) {
-    if (player.flyTimer > 0) player.flyTimer--;
+    if (player.flyTimer > 0 && --player.flyTimer === 0) wingsWoreOff(player, true);
     if (up) player.vy = Math.max(player.vy - 0.52, -5.4);
   }
   if (inWaterVoid) player.vx *= 0.95;
   let newX = player.x + player.vx;
   let newY = player.y + player.vy;
+  // flying can't take you off the top of the screen
+  if (player.flyTimer !== 0 && newY < FLY_CEILING) { newY = FLY_CEILING; if (player.vy < 0) player.vy = 0; }
   newY = tryHitItemBox(player, newX, newY);
 
   // wall / ceiling contact reset
   player.wallContact     = false;
   player.wallContactDir  = 0;
   player.onGround        = false;
+  player.groundPlat      = null;
 
   // platform collision
   platforms.forEach(p => {
@@ -2473,6 +3172,7 @@ function update() {
     // floor (landing on top)
     if (player.vy >= 0 && newY + PH >= p.y && player.y + PH <= p.y + p.h && newX + PW > p.x && newX < p.x + p.w) {
       newY = p.y - PH; player.vy = 0; player.onGround = true; player.usedDouble = false;
+      player.groundPlat = p; player.wallKickTimer = 0;
       p.occupied = true;
       if (p.type === 'shaky' && !p.falling) {
         p.standTimer = (p.standTimer || 0) + 1;
@@ -2486,17 +3186,19 @@ function update() {
         }
       }
     }
-    // wall climb slow (lv4+)
-    if (player.canWallClimb && player.wallContact && player.vy > 0) {
-      player.vy *= 0.35;
-    }
   });
+  // wall climb slow (lv4+) — applied once per frame, after collisions.
+  // (It used to run inside the platform loop, so it compounded ~30x and glued you to walls.)
+  if (player.canWallClimb && player.wallContact && !player.onGround && player.vy > 0) {
+    player.vy *= 0.35;
+  }
 
   player.x = newX;
   player.y = newY;
 
   // sprite animation tracking
-  if (Math.abs(player.vx) > 0.5 && player.onGround) pWalkTick += 0.32;
+  // step rate follows actual speed (slow tilt = slow steps, speed donut = fast steps)
+  if (Math.abs(player.vx) > 0.5 && player.onGround) pWalkTick += 0.32 * Math.min(1.8, Math.abs(player.vx) / SPEED);
   if (!pWasOnGround && player.onGround) pLandTimer = 7;
   if (pLandTimer > 0) pLandTimer--;
   pWasOnGround = player.onGround;
@@ -2631,9 +3333,9 @@ function update() {
       f.collected = true; score += 15;
       incrementGoal('fruit');
       if (f.type === 'donut') {
-        player.flyTimer = -1;
+        player.flyTimer = FLY_DURATION;
         spawnParticles(f.x + 7, f.y + 7, '#f472b6', 12);
-        showToast('DONUT WINGS! STAYS UNTIL YOU GET HIT');
+        showToast('DONUT WINGS! 5 SECONDS');
         playNote(740, 988, 0.18, 'triangle', 0.12);
       } else if (f.type === 'power_orb') {
         powerLevel = Math.min(5, powerLevel + 1);
@@ -2782,7 +3484,7 @@ function update() {
           f.collected = true; score += 15;
           incrementGoal('fruit');
           if (f.type === 'donut') {
-            player2.flyTimer = -1;
+            player2.flyTimer = FLY_DURATION;
             spawnParticles(f.x+7, f.y+7, '#f472b6', 10);
             playNote(740, 988, 0.18, 'triangle', 0.12);
           } else if (f.type === 'power_orb') {
@@ -2886,8 +3588,48 @@ function updateHPBar() {
   bar.innerHTML = html;
 }
 
+// Donut wings last 5 seconds (a bar above the character counts down), then you float back down.
+const FLY_DURATION = 300;   // frames (60 per second)
+const FLY_CEILING = 6;      // highest a flying character can go (top of the screen)
+function wingsWoreOff(pl, isP1) {
+  spawnParticles(pl.x + PW/2, pl.y + PH/2, '#f9a8d4', 10);
+  if (isP1) showToast('WINGS WORE OFF');
+}
+// Little countdown bar over a flying character (blinks in the last second),
+// or an arrow at the top edge if a jump pad flings you above the screen.
+function drawFlightAndOffscreen(pl, px, py) {
+  if (pl.flyTimer > 0) {
+    const t = pl.flyTimer / FLY_DURATION;
+    if (!(pl.flyTimer < 60 && Math.floor(pl.flyTimer / 6) % 2 === 0)) {
+      const bw = 26, bx = px + PW/2 - bw/2, by = Math.max(2, py - 12);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath(); ctx.roundRect(bx - 1, by - 1, bw + 2, 5, 2.5); ctx.fill();
+      ctx.fillStyle = t > 0.35 ? '#f9a8d4' : '#fb7185';
+      ctx.beginPath(); ctx.roundRect(bx, by, bw * t, 3, 1.5); ctx.fill();
+    }
+  }
+  if (py + PH < 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.moveTo(px + PW/2, 3); ctx.lineTo(px + PW/2 - 6, 12); ctx.lineTo(px + PW/2 + 6, 12); ctx.closePath(); ctx.fill();
+  }
+}
+
+function carryOnMovingPlatform(pl) {
+  const p = pl && pl.groundPlat;
+  if (!p || !pl.onGround || p.type !== 'moving' || !p.lastDy) return;
+  // only if still standing on it (guards against respawns/teleports)
+  const prevTop = p.y - p.lastDy;
+  if (Math.abs(pl.y + PH - prevTop) > 2 || pl.x + PW <= p.x || pl.x >= p.x + p.w) return;
+  pl.y += p.lastDy;
+}
+
+function hapticPulse(ms) {
+  if (isTouchDevice && navigator.vibrate) { try { navigator.vibrate(ms); } catch (_) {} }
+}
+
 function hurtPlayer() {
   if (invincibleTimer>0) return;
+  hapticPulse(40);
   player.hp--; invincibleTimer=90;
   player.vy=-5;
   playHurtSound();
@@ -3226,7 +3968,7 @@ function updatePlayer2() {
   const inWaterVoid = inHiddenLevel && hiddenFromLevel === 3;
 
   // sprite animation
-  if (Math.abs(player2.vx) > 0.5 && player2.onGround) p2WalkTick += 0.32;
+  if (Math.abs(player2.vx) > 0.5 && player2.onGround) p2WalkTick += 0.32 * Math.min(1.8, Math.abs(player2.vx) / SPEED);
   if (!p2WasOnGround && player2.onGround) p2LandTimer = 7;
   if (p2LandTimer > 0) p2LandTimer--;
   p2WasOnGround = player2.onGround;
@@ -3238,9 +3980,14 @@ function updatePlayer2() {
     if (player2.dashTimer<=0) { player2.dashing=false; player2.vx=0; }
   } else {
     const moveSpeed = SPEED * charSpeedMult * (player2.speedDonutTimer > 0 ? 1.45 : 1);
-    player2.vx=0;
-    if (left)  { player2.vx=-moveSpeed; player2.facing=-1; }
-    if (right) { player2.vx= moveSpeed; player2.facing= 1; }
+    if (player2.wallKickTimer > 0) {
+      player2.wallKickTimer--;
+      player2.vx *= 0.9;
+    } else {
+      player2.vx=0;
+      if (left)  { player2.vx=-moveSpeed; player2.facing=-1; }
+      if (right) { player2.vx= moveSpeed; player2.facing= 1; }
+    }
     if (dash && player.canDash && player2.dashCooldown<=0 && (left||right)) {
       player2.dashing=true; player2.dashTimer=10;
       player2.vx=player2.facing*moveSpeed*2.9; player2.dashCooldown=48;
@@ -3256,7 +4003,7 @@ function updatePlayer2() {
       player2.vy=JUMP_V; player2.onGround=false; player2.usedDouble=false; playJumpSound();
     } else if (player2.wallContact) {
       player2.vy=JUMP_V*0.92; player2.vx=player2.wallContactDir*-SPEED*2.5;
-      player2.facing=player2.wallContactDir*-1; player2.usedDouble=false; player2.wallContact=false; playJumpSound();
+      player2.facing=player2.wallContactDir*-1; player2.wallKickTimer=12; player2.usedDouble=false; player2.wallContact=false; playJumpSound();
     } else if (!player2.usedDouble) {
       player2.vy=JUMP_V*0.82; player2.usedDouble=true; playDoubleJumpSound();
     }
@@ -3281,13 +4028,14 @@ function updatePlayer2() {
 
   player2.vy += (player2.flyTimer !== 0 ? GRAVITY * 0.22 : GRAVITY) * (inWaterVoid ? 0.34 : 1);
   if (player2.flyTimer !== 0) {
-    if (player2.flyTimer > 0) player2.flyTimer--;
+    if (player2.flyTimer > 0 && --player2.flyTimer === 0) wingsWoreOff(player2, false);
     if (up) player2.vy = Math.max(player2.vy - 0.52, -5.4);
   }
   if (inWaterVoid) player2.vx *= 0.95;
   let nx=player2.x+player2.vx, ny=player2.y+player2.vy;
+  if (player2.flyTimer !== 0 && ny < FLY_CEILING) { ny = FLY_CEILING; if (player2.vy < 0) player2.vy = 0; }
   ny = tryHitItemBox(player2, nx, ny);
-  player2.wallContact=false; player2.wallContactDir=0; player2.onGround=false;
+  player2.wallContact=false; player2.wallContactDir=0; player2.onGround=false; player2.groundPlat=null;
 
   platforms.forEach(p => {
     if (player2.vx>=0 && nx+PW>p.x && player2.x+PW<=p.x+3 && ny+PH>p.y+2 && ny<p.y+p.h-2)
@@ -3295,7 +4043,7 @@ function updatePlayer2() {
     else if (player2.vx<=0 && nx<p.x+p.w && player2.x>=p.x+p.w-3 && ny+PH>p.y+2 && ny<p.y+p.h-2)
       { nx=p.x+p.w; player2.vx=0; player2.wallContact=true; player2.wallContactDir=-1; }
     if (player2.vy>=0 && ny+PH>=p.y && player2.y+PH<=p.y+p.h && nx+PW>p.x && nx<p.x+p.w)
-      { ny=p.y-PH; player2.vy=0; player2.onGround=true; player2.usedDouble=false; p.occupied = true;
+      { ny=p.y-PH; player2.vy=0; player2.onGround=true; player2.usedDouble=false; player2.groundPlat=p; player2.wallKickTimer=0; p.occupied = true;
         if (p.type === 'shaky' && !p.falling) {
           p.standTimer = (p.standTimer || 0) + 1;
           if (p.boostArmed !== false && (p.boostCooldown || 0) <= 0) {
@@ -3307,8 +4055,9 @@ function updatePlayer2() {
           }
         }
       }
-    if (player.canWallClimb && player2.wallContact && player2.vy>0) player2.vy*=0.35;
   });
+  // P2 shares P1's unlocked powers, so it checks player.canWallClimb on purpose
+  if (player.canWallClimb && player2.wallContact && !player2.onGround && player2.vy>0) player2.vy*=0.35;
 
   player2.x=nx; player2.y=ny;
 
@@ -3741,22 +4490,44 @@ function drawPlatforms(b) {
     const px=p.x-scrollX;
     if (px+p.w<-10||px>W+10) return;
     const shakeX = p.type === 'shaky' && !p.falling ? Math.sin(frameCount * 0.4 + (p.shakePhase || 0)) * Math.min(3, (p.standTimer || 0) / 45) : 0;
-    const py = p.y + (p.type === 'shaky' && p.falling ? Math.sin(frameCount * 0.7 + px) * 1.5 : 0);
+    const py = p.y + (p.type === 'shaky' && p.falling ? Math.sin(frameCount * 0.7 + p.x) * 1.5 : 0);
+    const x = px + shakeX;
+    // body
     ctx.fillStyle = p.type === 'sinking' ? '#7c3aed' : b.ground;
-    ctx.beginPath(); ctx.roundRect(px + shakeX, py, p.w, p.h, 4); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(x, py, p.w, p.h, 4); ctx.fill();
+    // soft underside shade + top lip that follows the rounded corners
+    ctx.fillStyle = 'rgba(0,0,0,0.18)';
+    ctx.beginPath(); ctx.roundRect(x, py + p.h - 3, p.w, 3, [0, 0, 4, 4]); ctx.fill();
     ctx.fillStyle = p.type === 'sinking' ? '#c4b5fd' : b.accent;
-    ctx.fillRect(px + 3 + shakeX, py, p.w-6, 3);
-    // moving platform indicator
+    ctx.beginPath(); ctx.roundRect(x, py, p.w, 4, [4, 4, 1, 1]); ctx.fill();
+    // a little texture (fixed per platform, so it doesn't flicker)
+    if (p.h >= 10) {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      for (let i = 7; i < p.w - 6; i += 13) {
+        const o = Math.abs(Math.round(p.x + i * 7)) % 4;
+        ctx.fillRect(x + i, py + 6 + o, 2, 2);
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      for (let i = 4; i < p.w - 4; i += 9) ctx.fillRect(x + i, py + 1, 3, 1);
+    }
     if (p.type==='moving') {
-      ctx.fillStyle='rgba(255,255,100,0.5)';
-      ctx.fillRect(px+p.w/2-6, py+4, 12, 4);
+      // little arrows showing which way it's heading
+      const up = (p.vy * p.dir) < 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      for (const ox of [-7, 7]) {
+        const cx = x + p.w/2 + ox, cy = py + p.h/2 + 1;
+        ctx.beginPath();
+        if (up) { ctx.moveTo(cx - 4, cy + 2); ctx.lineTo(cx + 4, cy + 2); ctx.lineTo(cx, cy - 3); }
+        else    { ctx.moveTo(cx - 4, cy - 2); ctx.lineTo(cx + 4, cy - 2); ctx.lineTo(cx, cy + 3); }
+        ctx.closePath(); ctx.fill();
+      }
     } else if (p.type==='shaky') {
-      ctx.fillStyle = p.falling ? 'rgba(239,68,68,0.65)' : 'rgba(250,204,21,0.6)';
-      ctx.fillRect(px + p.w/2 - 7 + shakeX, py + 4, 14, 4);
+      ctx.fillStyle = p.falling ? 'rgba(239,68,68,0.75)' : 'rgba(250,204,21,0.7)';
+      ctx.beginPath(); ctx.roundRect(x + p.w/2 - 8, py + 5, 16, 4, 2); ctx.fill();
     } else if (p.type === 'sinking') {
       const warn = Math.min(1, Math.max(0, ((p.standTimer || 0) - 90) / 30));
       ctx.fillStyle = `rgba(248,113,113,${0.35 + warn * 0.45})`;
-      ctx.fillRect(px + p.w/2 - 8 + shakeX, py + 4, 16, 4);
+      ctx.beginPath(); ctx.roundRect(x + p.w/2 - 8, py + 5, 16, 4, 2); ctx.fill();
     }
   });
 }
@@ -4168,8 +4939,85 @@ function drawFruits() {
   });
 }
 
+function shadeColor(hex, amt) {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex || '');
+  if (!m) return 'rgba(15,23,42,0.45)';
+  const n = parseInt(m[1], 16);
+  const f = c => Math.max(0, Math.min(255, Math.round(c + (amt < 0 ? c * amt : (255 - c) * amt))));
+  return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+}
+
+// Shared by P1 and P2. Draws in the character's local space (origin = body centre, facing right).
+function drawWalkerFeet(pl, walkTick, bodyCol) {
+  const ground = PH / 2;                 // the floor line — planted feet never go below it
+  const footW = 8, footH = 4;
+  if (pl.flyTimer > 0) {                 // flying: dangling legs + little wings (unchanged look)
+    const wingSwing = Math.sin(frameCount * 0.95) * 7, legLift = wingSwing * 0.35;
+    ctx.fillStyle = bodyCol;
+    ctx.save(); ctx.translate(-PW/2 + 5, PH/2 - 6); ctx.rotate(-0.55 + legLift * 0.03);
+    ctx.beginPath(); ctx.roundRect(-1, -1, 4, 12, 2); ctx.fill(); ctx.restore();
+    ctx.save(); ctx.translate(PW/2 - 5, PH/2 - 6); ctx.rotate(0.55 - legLift * 0.03);
+    ctx.beginPath(); ctx.roundRect(-3, -1, 4, 12, 2); ctx.fill(); ctx.restore();
+    ctx.fillStyle = '#fde68a';
+    ctx.fillRect(-PW/2 + 2, PH/2 + 4 + legLift * 0.12, 3, 3);
+    ctx.fillRect(PW/2 - 5, PH/2 + 4 - legLift * 0.12, 3, 3);
+    return;
+  }
+  ctx.fillStyle = shadeColor(bodyCol, -0.32);
+  const foot = (x, lift) => { ctx.beginPath(); ctx.roundRect(x, ground - footH - lift, footW, footH, 2); ctx.fill(); };
+  const backX = -PW/2 + 1, frontX = PW/2 - footW - 1;
+  if (pl.dashing) {                       // tucked back, streamlined
+    foot(backX - 3, 2); foot(backX + 4, 1);
+  } else if (!pl.onGround) {
+    if (pl.vy < 0) { foot(backX + 1, 3); foot(frontX - 1, 1); }   // rising: knees up
+    else           { foot(backX, 0);     foot(frontX + 1, 0); }   // falling: legs down, ready to land
+  } else if (Math.abs(pl.vx) > 0.5) {     // walk cycle: feet swap front/back and lift as they pass
+    const ph = walkTick * 2.2;
+    const s1 = Math.sin(ph), s2 = -s1;
+    foot(backX + 2 + s1 * 3, Math.max(0, Math.cos(ph)) * 3);
+    foot(frontX - 2 + s2 * 3, Math.max(0, -Math.cos(ph)) * 3);
+  } else {
+    foot(backX, 0); foot(frontX, 0);       // standing
+  }
+}
+
+// Soft light from the top-left + darker base + thin outline, so the hero reads as a solid shape.
+function drawBodyShading() {
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.roundRect(-PW/2 + 2, -PH/2 + 3, 3, PH - 11, 1.5); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.roundRect(-PW/2, PH/2 - 7, PW, 7, [0, 0, 5, 5]); ctx.fill();
+  ctx.strokeStyle = 'rgba(15,23,42,0.35)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(-PW/2 + 0.5, -PH/2 + 0.5, PW - 1, PH - 1, 5); ctx.stroke();
+}
+
+// Soft shadow on the platform under a character — shrinks and fades as they go higher.
+function drawGroundShadow(cx, feetY, w) {
+  let top = null;
+  for (const p of platforms) {
+    if (cx < p.x || cx > p.x + p.w || p.y < feetY - 3) continue;
+    if (top === null || p.y < top) top = p.y;
+  }
+  if (top === null) return;
+  const gap = top - feetY;
+  if (gap > 220) return;
+  const k = 1 - gap / 220;
+  ctx.fillStyle = `rgba(0,0,0,${0.22 * k})`;
+  ctx.beginPath(); ctx.ellipse(cx - scrollX, top + 1, (w / 2 + 2) * (0.55 + 0.45 * k), 2.6 * (0.6 + 0.4 * k), 0, 0, Math.PI * 2); ctx.fill();
+}
+function drawAllGroundShadows() {
+  if (state !== 'intro') drawGroundShadow(player.x + PW/2, player.y + PH, PW);
+  if (coopMode && player2 && !(player2.respawnTimer > 0)) drawGroundShadow(player2.x + PW/2, player2.y + PH, PW);
+  for (const e of enemies) {
+    if (e.dead || e.type === 'flower') continue;
+    const sx = e.x - scrollX; if (sx < -40 || sx > W + 40) continue;
+    drawGroundShadow(e.x + e.w/2, e.y + e.h, e.w);
+  }
+}
+
 function drawPlayer() {
-  if (invincibleTimer>0 && Math.floor(invincibleTimer/4)%2===0) return;
+  // after a hit: flicker semi-transparent instead of vanishing, so you never lose track of yourself
+  const baseA = (invincibleTimer>0 && Math.floor(invincibleTimer/4)%2===0) ? 0.3 : 1;
   const px=player.x-scrollX;
   const py=player.y;
   const bodyColors=getCurrentCharacterColors();
@@ -4190,65 +5038,45 @@ function drawPlayer() {
   }
 
   ctx.save();
-  ctx.translate(px+PW/2, py+PH/2);
+  // squash/stretch is anchored at the feet so landing squashes DOWN into the ground
+  // (it used to scale around the middle, which lifted the feet off the floor)
+  ctx.translate(px+PW/2, py+PH);
   if (sinkRot) ctx.rotate(sinkRot);
   ctx.scale(player.facing * scX, scY);
+  ctx.translate(0, -PH/2);
+  ctx.globalAlpha = baseA;
 
   // dash trail
   if (player.dashing) {
-    ctx.globalAlpha=0.25;
+    ctx.globalAlpha=0.25*baseA;
     for (let t=1;t<=3;t++) {
       ctx.fillStyle=bodyCol;
       ctx.beginPath(); ctx.roundRect(-PW/2-t*8, -PH/2, PW, PH, 4); ctx.fill();
     }
-    ctx.globalAlpha=1;
+    ctx.globalAlpha=baseA;
   }
 
   // body glow aura at high power
   if (powerLevel>=4) {
-    ctx.shadowBlur=18; ctx.shadowColor=bodyCol; ctx.globalAlpha=0.7;
+    ctx.shadowBlur=18; ctx.shadowColor=bodyCol; ctx.globalAlpha=0.7*baseA;
     ctx.fillStyle=bodyCol;
     ctx.beginPath(); ctx.roundRect(-PW/2-2,-PH/2-2,PW+4,PH+4,6); ctx.fill();
-    ctx.shadowBlur=0; ctx.globalAlpha=1;
+    ctx.shadowBlur=0; ctx.globalAlpha=baseA;
   }
 
   ctx.fillStyle=bodyCol;
   ctx.beginPath(); ctx.roundRect(-PW/2,-PH/2,PW,PH,5); ctx.fill();
+  drawBodyShading();
   drawCharacterAccessoriesLocal(ctx, charStats, bodyCol, false, false);
 
-  // Animated feet
-  if (!player.dashing) {
-    const wingSwing = player.flyTimer > 0 ? Math.sin(frameCount * 0.95) * 7 : 0;
-    const swing = player.flyTimer > 0
-      ? wingSwing
-      : (player.onGround && Math.abs(player.vx) > 0.5 ? Math.sin(pWalkTick * 2.2) * 4 : 0);
-    ctx.fillStyle = bodyCol;
-    if (player.flyTimer > 0) {
-      const legLift = wingSwing * 0.35;
-      ctx.save();
-      ctx.translate(-PW/2 + 5, PH/2 - 6);
-      ctx.rotate(-0.55 + legLift * 0.03);
-      ctx.beginPath(); ctx.roundRect(-1, -1, 4, 12, 2); ctx.fill();
-      ctx.restore();
-      ctx.save();
-      ctx.translate(PW/2 - 5, PH/2 - 6);
-      ctx.rotate(0.55 - legLift * 0.03);
-      ctx.beginPath(); ctx.roundRect(-3, -1, 4, 12, 2); ctx.fill();
-      ctx.restore();
-      ctx.fillStyle = '#fde68a';
-      ctx.fillRect(-PW/2 + 2, PH/2 + 4 + legLift * 0.12, 3, 3);
-      ctx.fillRect(PW/2 - 5, PH/2 + 4 - legLift * 0.12, 3, 3);
-    } else {
-      ctx.beginPath(); ctx.roundRect(-PW/2+1, PH/2-2+swing, 7, 5, 2); ctx.fill();
-      ctx.beginPath(); ctx.roundRect(PW/2-8, PH/2-2-swing, 7, 5, 2); ctx.fill();
-    }
-  }
+  // Feet (shaded so they read as shoes, never sink into the floor or float off the body)
+  drawWalkerFeet(player, pWalkTick, bodyCol);
 
-  // face
-  const isIdle = !waterDeathPending && player.onGround && player.vx === 0 && !player.dashing && !player.attackTimer;
+  // face (same idle rule as update(), so face and idle timers always agree)
+  const isIdle = !waterDeathPending && player.onGround && Math.abs(player.vx) < 0.05 && !player.dashing && !player.attackTimer;
   if (isIdle) {
     const bob = Math.sin(frameCount * 0.06) * 1.5;
-    ctx.save(); ctx.translate(0, Math.round(bob));
+    ctx.save(); ctx.translate(0, bob);
     ctx.fillStyle = '#fff';
     if (IDLE_FACES[idleFaceIdx] === 'blink') {
       ctx.fillRect(-8,-10,7,2); ctx.fillRect(1,-10,7,2);
@@ -4288,8 +5116,8 @@ function drawPlayer() {
     ctx.fillStyle = '#0f172a';
     // two eyes for active state
     ctx.fillRect(-7,-9,5,5); ctx.fillRect(3,-9,5,5);
-    // determined mouth
-    ctx.fillRect(2,5,10,2);
+    // determined mouth (kept inside the body — it used to poke out past the right edge)
+    ctx.fillRect(1,5,8,2);
   }
 
   // punch fist
@@ -4301,6 +5129,7 @@ function drawPlayer() {
   }
 
   ctx.restore();
+  drawFlightAndOffscreen(player, px, py);
 }
 
 function drawHeartPopups() {
@@ -4439,7 +5268,7 @@ function drawWakeIntroCutscene() {
   ctx.textAlign = 'center';
   ctx.fillText('WAKING UP...', W / 2, H - 20);
   ctx.font = '10px monospace';
-  ctx.fillText('PRESS SPACE, ENTER, Z, X OR TAP TO SKIP', W / 2, H - 8);
+  ctx.fillText(isTouchDevice ? 'TAP TO SKIP' : 'PRESS SPACE, ENTER, Z, X OR TAP TO SKIP', W / 2, H - 8);
   ctx.textAlign = 'left';
 }
 
@@ -4454,6 +5283,7 @@ function draw() {
   drawHiddenTrigger();
   drawHealthPacks();
   drawFruits();
+  drawAllGroundShadows();
   drawEnemies(b);
   drawProjectiles();
   drawBoss();
@@ -4539,7 +5369,7 @@ function drawPlayer2() {
     ctx.restore();
     return;
   }
-  if (p2InvincTimer > 0 && Math.floor(p2InvincTimer/4)%2===0) return;
+  const baseA2 = (p2InvincTimer > 0 && Math.floor(p2InvincTimer/4)%2===0) ? 0.3 : 1;
 
   const px = player2.x - scrollX;
   const py = player2.y;
@@ -4556,52 +5386,32 @@ function drawPlayer2() {
   const bodyCol = bodyColors[Math.min(powerLevel-1,4)];
 
   ctx.save();
-  ctx.translate(px+PW/2, py+PH/2);
+  ctx.translate(px+PW/2, py+PH);          // anchor squash at the feet
   ctx.scale(player2.facing * scX, scY);
+  ctx.translate(0, -PH/2);
+  ctx.globalAlpha = baseA2;
 
   // Dash trail
   if (player2.dashing) {
-    ctx.globalAlpha=0.22;
+    ctx.globalAlpha=0.22*baseA2;
     for(let t=1;t<=3;t++) { ctx.fillStyle=bodyCol; ctx.beginPath(); ctx.roundRect(-PW/2-t*8,-PH/2,PW,PH,4); ctx.fill(); }
-    ctx.globalAlpha=1;
+    ctx.globalAlpha=baseA2;
   }
 
   // Aura at high power
   if (powerLevel>=4) {
-    ctx.shadowBlur=14; ctx.shadowColor=bodyCol; ctx.globalAlpha=0.65;
+    ctx.shadowBlur=14; ctx.shadowColor=bodyCol; ctx.globalAlpha=0.65*baseA2;
     ctx.fillStyle=bodyCol; ctx.beginPath(); ctx.roundRect(-PW/2-2,-PH/2-2,PW+4,PH+4,6); ctx.fill();
-    ctx.shadowBlur=0; ctx.globalAlpha=1;
+    ctx.shadowBlur=0; ctx.globalAlpha=baseA2;
   }
 
   ctx.fillStyle = bodyCol;
   ctx.beginPath(); ctx.roundRect(-PW/2,-PH/2,PW,PH,5); ctx.fill();
+  drawBodyShading();
   drawCharacterAccessoriesLocal(ctx, charStats, bodyCol, false, true);
 
   // Feet
-  if (!player2.dashing) {
-    const wingSwing = player2.flyTimer > 0 ? Math.sin(frameCount * 0.95) * 7 : 0;
-    const swing = player2.flyTimer > 0 ? wingSwing : (player2.onGround && Math.abs(player2.vx) > 0.5 ? Math.sin(p2WalkTick*2.2)*4 : 0);
-    ctx.fillStyle = bodyCol;
-    if (player2.flyTimer > 0) {
-      const legLift = wingSwing * 0.35;
-      ctx.save();
-      ctx.translate(-PW/2 + 5, PH/2 - 6);
-      ctx.rotate(-0.55 + legLift * 0.03);
-      ctx.beginPath(); ctx.roundRect(-1, -1, 4, 12, 2); ctx.fill();
-      ctx.restore();
-      ctx.save();
-      ctx.translate(PW/2 - 5, PH/2 - 6);
-      ctx.rotate(0.55 - legLift * 0.03);
-      ctx.beginPath(); ctx.roundRect(-3, -1, 4, 12, 2); ctx.fill();
-      ctx.restore();
-      ctx.fillStyle = '#fde68a';
-      ctx.fillRect(-PW/2 + 2, PH/2 + 4 + legLift * 0.12, 3, 3);
-      ctx.fillRect(PW/2 - 5, PH/2 + 4 - legLift * 0.12, 3, 3);
-    } else {
-      ctx.beginPath(); ctx.roundRect(-PW/2+1, PH/2-2+swing, 7, 5, 2); ctx.fill();
-      ctx.beginPath(); ctx.roundRect(PW/2-8,  PH/2-2-swing, 7, 5, 2); ctx.fill();
-    }
-  }
+  drawWalkerFeet(player2, p2WalkTick, bodyCol);
 
   // P2 label
   ctx.fillStyle='rgba(255,255,255,0.5)'; ctx.font='bold 7px monospace'; ctx.textAlign='center';
@@ -4619,6 +5429,7 @@ function drawPlayer2() {
   }
 
   ctx.restore();
+  drawFlightAndOffscreen(player2, px, py);
 }
 
 // ─────────────────────────────────────────────
@@ -4917,12 +5728,74 @@ wrapper.addEventListener('contextmenu', e => {
 // ─────────────────────────────────────────────
 //  LOOP
 // ─────────────────────────────────────────────
-function loop() {
-  update();
-  draw();
+// The game logic is written "per frame" (speeds, timers, gravity all assume
+// 60 updates per second). Screens refresh at 60, 90, 120 or 144 Hz, so we run
+// update() on a fixed 60 Hz clock and just draw as often as the screen wants.
+// Without this the whole game runs 2x fast on 120 Hz phones/iPads.
+const STEP_MS = 1000 / 60;
+let lastFrameTime = performance.now();
+let stepAccumulator = 0;
+let lastUiState = null, lastCanAtk = null, lastCanDash = null;
+let avgFrameMs = STEP_MS;
+
+// Smooth motion on 90/120/144 Hz screens: the game only moves things 60 times a second,
+// so for the frames in between we draw everything part-way between its last two positions.
+// (Without this, every position is shown twice on a 120 Hz phone — that reads as stutter.)
+function interpTargets() {
+  const list = [player, player2, helperBot, boss];
+  return list.concat(platforms, enemies, fruits, healthPacks, projectiles);
+}
+function snapshotPositions() {
+  prevScrollX = scrollX;
+  for (const o of interpTargets()) { if (o) { o._px = o.x; o._py = o.y; } }
+}
+let prevScrollX = 0;
+function withInterpolation(alpha, drawFn) {
+  if (alpha >= 0.999) { drawFn(); return; }
+  const saved = [];
+  for (const o of interpTargets()) {
+    if (!o || o._px === undefined) continue;
+    const dx = o.x - o._px, dy = o.y - o._py;
+    if (Math.abs(dx) > 60 || Math.abs(dy) > 60) continue;   // teleported — don't smear
+    saved.push(o, o.x, o.y);
+    o.x = o._px + dx * alpha; o.y = o._py + dy * alpha;
+  }
+  const sx = scrollX;
+  if (Math.abs(sx - prevScrollX) < 60) scrollX = prevScrollX + (sx - prevScrollX) * alpha;
+  try { drawFn(); }
+  finally {
+    scrollX = sx;
+    for (let i = 0; i < saved.length; i += 3) { saved[i].x = saved[i + 1]; saved[i].y = saved[i + 2]; }
+  }
+}
+
+function loop(now = performance.now()) {
+  let dt = now - lastFrameTime;
+  lastFrameTime = now;
+  if (dt > 250) dt = 250;                          // tab was asleep — don't fast-forward
+  avgFrameMs += (dt - avgFrameMs) * 0.05;
+  if (Math.abs(dt - STEP_MS) < 1.5) dt = STEP_MS;  // absorb jitter on 60 Hz screens
+  stepAccumulator += dt;
+  let steps = 0;
+  while (stepAccumulator >= STEP_MS && steps < 5) {
+    snapshotPositions();
+    update();
+    stepAccumulator -= STEP_MS;
+    steps++;
+  }
+  if (steps === 5) stepAccumulator = 0;           // very slow device: drop the backlog
+  // On 60 Hz screens draw the latest state as-is (no added lag); on faster screens blend.
+  const highRefresh = avgFrameMs < 13;
+  withInterpolation(highRefresh ? stepAccumulator / STEP_MS : 1, draw);
+  if (state !== lastUiState) { document.body.classList.toggle('playing', state === 'play'); lastUiState = state; }
+  const canAtk = !!(player.canPunch || player.canShoot || player.canBurst), canDash = !!player.canDash;
+  if (canAtk !== lastCanAtk || canDash !== lastCanDash) {
+    document.body.classList.toggle('can-attack', canAtk); document.body.classList.toggle('can-dash', canDash);
+    lastCanAtk = canAtk; lastCanDash = canDash;
+  }
   requestAnimationFrame(loop);
 }
-loop();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
