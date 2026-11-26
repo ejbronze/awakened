@@ -2126,10 +2126,16 @@ function refreshBtnKeys() {
 }
 
 // ---------- touch zones (TAP + TILT modes) ----------
-const zonePointers = new Map();  // pointerId -> { side, x0, y0, t0, swiped, jumpHold, order }
+// TAP mode rules (designed so you can jump in place AND jump while running):
+//  • Press and HOLD a side → after a split second you run that way. A quick tap doesn't move you.
+//  • Two quick taps (double-tap) → jump straight up, right where you are.
+//  • While one finger is holding (running), ANY tap with your other thumb → jump.
+//    You keep running in the same direction — the extra tap never steers.
+//  • Keep the jump finger down → keeps "jump" held (higher fly with donut wings).
+const zonePointers = new Map();  // pointerId -> { side, x0, y0, t0, swiped, jumpHold, role, moving, order }
 let zoneOrder = 0;
-let lastTap = { t: -1e9, x: 0 };
-const DOUBLE_TAP_MS = 300, SWIPE_PX = 40, SWIPE_MS = 260;
+let lastTapUp = -1e9;            // when the last quick tap was released
+const DOUBLE_TAP_MS = 300, QUICK_TAP_MS = 200, RUN_DELAY_MS = 110, SWIPE_PX = 40, SWIPE_MS = 260;
 function zonesActive() { return isTouchDevice && state === 'play' && (controlMode === 'tap' || controlMode === 'tilt'); }
 function triggerJump(z) {
   touchLatch.up = 2;
@@ -2137,13 +2143,25 @@ function triggerJump(z) {
   hapticPulse(8);
 }
 function refreshZones() {
-  // TAP mode: the most recent finger that's still down decides the direction
   if (controlMode === 'tap') {
-    let newest = null;
-    zonePointers.forEach(z => { if (!newest || z.order > newest.order) newest = z; });
-    touchAxis = newest ? (newest.side === 'L' ? -1 : 1) : 0;
+    // the newest finger that is actually running decides the direction
+    let runner = null;
+    zonePointers.forEach(z => { if (z.role === 'run' && z.moving && (!runner || z.order > runner.order)) runner = z; });
+    touchAxis = runner ? (runner.side === 'L' ? -1 : 1) : 0;
   }
   zoneKeys.up = [...zonePointers.values()].some(z => z.jumpHold);
+}
+// called every game update: a held finger starts running once it's clearly a hold, not a tap
+function updateZoneHolds() {
+  if (controlMode !== 'tap' || zonePointers.size === 0) return;
+  const now = performance.now();
+  let changed = false;
+  zonePointers.forEach(z => {
+    if (z.role === 'run' && !z.moving && now - z.t0 >= RUN_DELAY_MS) { z.moving = true; changed = true; }
+    // second tap of a double-tap held down → after the jump, keep running that way
+    if (z.role === 'jump' && z.fromDoubleTap && now - z.t0 >= QUICK_TAP_MS) { z.role = 'run'; z.moving = true; changed = true; }
+  });
+  if (changed) refreshZones();
 }
 
 const UI_SELECTOR = 'button, input, a, .menu-btn, #missionBox, [data-ui], .screen:not(.hidden)';
@@ -2161,14 +2179,14 @@ document.addEventListener('pointerdown', e => {
   e.preventDefault();
   const now = performance.now();
   const z = { side: e.clientX < window.innerWidth / 2 ? 'L' : 'R', x0: e.clientX, y0: e.clientY, t0: now,
-              swiped: false, jumpHold: false, order: ++zoneOrder };
+              swiped: false, jumpHold: false, role: 'run', moving: false, fromDoubleTap: false, order: ++zoneOrder };
   if (controlMode === 'tilt') {
-    triggerJump(z);                                    // tilt: any tap = jump
-  } else if (now - lastTap.t < DOUBLE_TAP_MS) {
-    triggerJump(z);                                    // tap: second quick tap = jump
-    lastTap.t = -1e9;                                  // a third tap starts a new pair (double jump)
-  } else {
-    lastTap = { t: now, x: e.clientX };
+    z.role = 'jump'; triggerJump(z);                   // tilt: any tap = jump
+  } else if ([...zonePointers.values()].some(o => o.role === 'run')) {
+    z.role = 'jump'; triggerJump(z);                   // other thumb taps while running = jump
+  } else if (now - lastTapUp < DOUBLE_TAP_MS) {
+    z.role = 'jump'; z.fromDoubleTap = true; triggerJump(z);   // double-tap = jump in place
+    lastTapUp = -1e9;
   }
   zonePointers.set(e.pointerId, z);
   refreshZones();
@@ -2187,6 +2205,7 @@ document.addEventListener('pointermove', e => {
     z.swiped = true;                                   // quick sideways swipe = dash that way
     touchLatch.dash = 3; touchLatch.dashDir = Math.sign(dx);
     z.side = dx < 0 ? 'L' : 'R';                       // and keep running the way you swiped
+    if (z.role === 'run') z.moving = true;
     refreshZones();
   } else if (controlMode === 'tap' && -dy > SWIPE_PX && -dy > Math.abs(dx) * 1.3) {
     z.swiped = true;                                   // quick upward swipe = jump (no double-tap needed)
@@ -2197,7 +2216,11 @@ document.addEventListener('pointermove', e => {
 
 function endPointer(e) {
   if (btnPointers.delete(e.pointerId)) { refreshBtnKeys(); return; }
-  if (!zonePointers.delete(e.pointerId)) return;
+  const z = zonePointers.get(e.pointerId);
+  if (!z) return;
+  zonePointers.delete(e.pointerId);
+  // a quick tap that didn't move you counts as the first half of a double-tap
+  if (z.role === 'run' && !z.swiped && performance.now() - z.t0 < QUICK_TAP_MS) lastTapUp = performance.now();
   refreshZones();
 }
 document.addEventListener('pointerup', endPointer);
@@ -2210,7 +2233,7 @@ function clearAllInput() {
   btnPointers.clear(); zonePointers.clear();
   zoneKeys.up = false;
   touchLatch.up = touchLatch.atk = touchLatch.dash = touchLatch.dashDir = 0;
-  lastTap.t = -1e9;
+  lastTapUp = -1e9;
   if (controlMode !== 'tilt') touchAxis = 0;
   document.querySelectorAll('[data-key].pressed').forEach(el => el.classList.remove('pressed'));
 }
@@ -2226,6 +2249,7 @@ function onPortraitChange() { if (isTouchDevice && portraitQuery.matches && stat
 portraitQuery.addEventListener ? portraitQuery.addEventListener('change', onPortraitChange) : portraitQuery.addListener(onPortraitChange);
 
 function tickTouchLatches() {
+  updateZoneHolds();
   if (touchLatch.up > 0) touchLatch.up--;
   if (touchLatch.atk > 0) touchLatch.atk--;
   if (touchLatch.dash > 0) touchLatch.dash--; else touchLatch.dashDir = 0;
@@ -3115,12 +3139,14 @@ function update() {
   // gravity & move
   player.vy += (player.flyTimer !== 0 ? GRAVITY * 0.22 : GRAVITY) * (inWaterVoid ? 0.34 : 1);
   if (player.flyTimer !== 0) {
-    if (player.flyTimer > 0) player.flyTimer--;
+    if (player.flyTimer > 0 && --player.flyTimer === 0) wingsWoreOff(player, true);
     if (up) player.vy = Math.max(player.vy - 0.52, -5.4);
   }
   if (inWaterVoid) player.vx *= 0.95;
   let newX = player.x + player.vx;
   let newY = player.y + player.vy;
+  // flying can't take you off the top of the screen
+  if (player.flyTimer !== 0 && newY < FLY_CEILING) { newY = FLY_CEILING; if (player.vy < 0) player.vy = 0; }
   newY = tryHitItemBox(player, newX, newY);
 
   // wall / ceiling contact reset
@@ -3303,9 +3329,9 @@ function update() {
       f.collected = true; score += 15;
       incrementGoal('fruit');
       if (f.type === 'donut') {
-        player.flyTimer = -1;
+        player.flyTimer = FLY_DURATION;
         spawnParticles(f.x + 7, f.y + 7, '#f472b6', 12);
-        showToast('DONUT WINGS! STAYS UNTIL YOU GET HIT');
+        showToast('DONUT WINGS! 5 SECONDS');
         playNote(740, 988, 0.18, 'triangle', 0.12);
       } else if (f.type === 'power_orb') {
         powerLevel = Math.min(5, powerLevel + 1);
@@ -3454,7 +3480,7 @@ function update() {
           f.collected = true; score += 15;
           incrementGoal('fruit');
           if (f.type === 'donut') {
-            player2.flyTimer = -1;
+            player2.flyTimer = FLY_DURATION;
             spawnParticles(f.x+7, f.y+7, '#f472b6', 10);
             playNote(740, 988, 0.18, 'triangle', 0.12);
           } else if (f.type === 'power_orb') {
@@ -3556,6 +3582,32 @@ function updateHPBar() {
     }
   }
   bar.innerHTML = html;
+}
+
+// Donut wings last 5 seconds (a bar above the character counts down), then you float back down.
+const FLY_DURATION = 300;   // frames (60 per second)
+const FLY_CEILING = 6;      // highest a flying character can go (top of the screen)
+function wingsWoreOff(pl, isP1) {
+  spawnParticles(pl.x + PW/2, pl.y + PH/2, '#f9a8d4', 10);
+  if (isP1) showToast('WINGS WORE OFF');
+}
+// Little countdown bar over a flying character (blinks in the last second),
+// or an arrow at the top edge if a jump pad flings you above the screen.
+function drawFlightAndOffscreen(pl, px, py) {
+  if (pl.flyTimer > 0) {
+    const t = pl.flyTimer / FLY_DURATION;
+    if (!(pl.flyTimer < 60 && Math.floor(pl.flyTimer / 6) % 2 === 0)) {
+      const bw = 26, bx = px + PW/2 - bw/2, by = Math.max(2, py - 12);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.beginPath(); ctx.roundRect(bx - 1, by - 1, bw + 2, 5, 2.5); ctx.fill();
+      ctx.fillStyle = t > 0.35 ? '#f9a8d4' : '#fb7185';
+      ctx.beginPath(); ctx.roundRect(bx, by, bw * t, 3, 1.5); ctx.fill();
+    }
+  }
+  if (py + PH < 0) {
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath(); ctx.moveTo(px + PW/2, 3); ctx.lineTo(px + PW/2 - 6, 12); ctx.lineTo(px + PW/2 + 6, 12); ctx.closePath(); ctx.fill();
+  }
 }
 
 function carryOnMovingPlatform(pl) {
@@ -3972,11 +4024,12 @@ function updatePlayer2() {
 
   player2.vy += (player2.flyTimer !== 0 ? GRAVITY * 0.22 : GRAVITY) * (inWaterVoid ? 0.34 : 1);
   if (player2.flyTimer !== 0) {
-    if (player2.flyTimer > 0) player2.flyTimer--;
+    if (player2.flyTimer > 0 && --player2.flyTimer === 0) wingsWoreOff(player2, false);
     if (up) player2.vy = Math.max(player2.vy - 0.52, -5.4);
   }
   if (inWaterVoid) player2.vx *= 0.95;
   let nx=player2.x+player2.vx, ny=player2.y+player2.vy;
+  if (player2.flyTimer !== 0 && ny < FLY_CEILING) { ny = FLY_CEILING; if (player2.vy < 0) player2.vy = 0; }
   ny = tryHitItemBox(player2, nx, ny);
   player2.wallContact=false; player2.wallContactDir=0; player2.onGround=false; player2.groundPlat=null;
 
@@ -4443,6 +4496,16 @@ function drawPlatforms(b) {
     ctx.beginPath(); ctx.roundRect(x, py + p.h - 3, p.w, 3, [0, 0, 4, 4]); ctx.fill();
     ctx.fillStyle = p.type === 'sinking' ? '#c4b5fd' : b.accent;
     ctx.beginPath(); ctx.roundRect(x, py, p.w, 4, [4, 4, 1, 1]); ctx.fill();
+    // a little texture (fixed per platform, so it doesn't flicker)
+    if (p.h >= 10) {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      for (let i = 7; i < p.w - 6; i += 13) {
+        const o = Math.abs(Math.round(p.x + i * 7)) % 4;
+        ctx.fillRect(x + i, py + 6 + o, 2, 2);
+      }
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      for (let i = 4; i < p.w - 4; i += 9) ctx.fillRect(x + i, py + 1, 3, 1);
+    }
     if (p.type==='moving') {
       // little arrows showing which way it's heading
       const up = (p.vy * p.dir) < 0;
@@ -4914,6 +4977,40 @@ function drawWalkerFeet(pl, walkTick, bodyCol) {
   }
 }
 
+// Soft light from the top-left + darker base + thin outline, so the hero reads as a solid shape.
+function drawBodyShading() {
+  ctx.fillStyle = 'rgba(255,255,255,0.22)';
+  ctx.beginPath(); ctx.roundRect(-PW/2 + 2, -PH/2 + 3, 3, PH - 11, 1.5); ctx.fill();
+  ctx.fillStyle = 'rgba(0,0,0,0.12)';
+  ctx.beginPath(); ctx.roundRect(-PW/2, PH/2 - 7, PW, 7, [0, 0, 5, 5]); ctx.fill();
+  ctx.strokeStyle = 'rgba(15,23,42,0.35)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(-PW/2 + 0.5, -PH/2 + 0.5, PW - 1, PH - 1, 5); ctx.stroke();
+}
+
+// Soft shadow on the platform under a character — shrinks and fades as they go higher.
+function drawGroundShadow(cx, feetY, w) {
+  let top = null;
+  for (const p of platforms) {
+    if (cx < p.x || cx > p.x + p.w || p.y < feetY - 3) continue;
+    if (top === null || p.y < top) top = p.y;
+  }
+  if (top === null) return;
+  const gap = top - feetY;
+  if (gap > 220) return;
+  const k = 1 - gap / 220;
+  ctx.fillStyle = `rgba(0,0,0,${0.22 * k})`;
+  ctx.beginPath(); ctx.ellipse(cx - scrollX, top + 1, (w / 2 + 2) * (0.55 + 0.45 * k), 2.6 * (0.6 + 0.4 * k), 0, 0, Math.PI * 2); ctx.fill();
+}
+function drawAllGroundShadows() {
+  if (state !== 'intro') drawGroundShadow(player.x + PW/2, player.y + PH, PW);
+  if (coopMode && player2 && !(player2.respawnTimer > 0)) drawGroundShadow(player2.x + PW/2, player2.y + PH, PW);
+  for (const e of enemies) {
+    if (e.dead || e.type === 'flower') continue;
+    const sx = e.x - scrollX; if (sx < -40 || sx > W + 40) continue;
+    drawGroundShadow(e.x + e.w/2, e.y + e.h, e.w);
+  }
+}
+
 function drawPlayer() {
   // after a hit: flicker semi-transparent instead of vanishing, so you never lose track of yourself
   const baseA = (invincibleTimer>0 && Math.floor(invincibleTimer/4)%2===0) ? 0.3 : 1;
@@ -4965,6 +5062,7 @@ function drawPlayer() {
 
   ctx.fillStyle=bodyCol;
   ctx.beginPath(); ctx.roundRect(-PW/2,-PH/2,PW,PH,5); ctx.fill();
+  drawBodyShading();
   drawCharacterAccessoriesLocal(ctx, charStats, bodyCol, false, false);
 
   // Feet (shaded so they read as shoes, never sink into the floor or float off the body)
@@ -5027,6 +5125,7 @@ function drawPlayer() {
   }
 
   ctx.restore();
+  drawFlightAndOffscreen(player, px, py);
 }
 
 function drawHeartPopups() {
@@ -5180,6 +5279,7 @@ function draw() {
   drawHiddenTrigger();
   drawHealthPacks();
   drawFruits();
+  drawAllGroundShadows();
   drawEnemies(b);
   drawProjectiles();
   drawBoss();
@@ -5303,6 +5403,7 @@ function drawPlayer2() {
 
   ctx.fillStyle = bodyCol;
   ctx.beginPath(); ctx.roundRect(-PW/2,-PH/2,PW,PH,5); ctx.fill();
+  drawBodyShading();
   drawCharacterAccessoriesLocal(ctx, charStats, bodyCol, false, true);
 
   // Feet
@@ -5324,6 +5425,7 @@ function drawPlayer2() {
   }
 
   ctx.restore();
+  drawFlightAndOffscreen(player2, px, py);
 }
 
 // ─────────────────────────────────────────────

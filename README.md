@@ -43,12 +43,12 @@ Pick a control style on the start screen (or any time from **MENU → CONTROLS**
 
 | Style | Move | Jump | Dash | Attack |
 |-------|------|------|------|--------|
-| 👆 **TAP** *(default)* | **Hold** the left half = run left, **hold** the right half = run right | **Double-tap** (or swipe up). Double-tap again in midair = double jump | Swipe ← or → | **ATK** button |
+| 👆 **TAP** *(default)* | **Hold** the left half = run left, **hold** the right half = run right (a quick tap doesn't move you) | Standing still: **double-tap** — you jump straight up. Running: **tap with your other thumb**. Swipe up also jumps | Swipe ← or → | **ATK** button |
 | 📱 **TILT** | Tilt the phone — a little to walk, more to sprint | **Tap** anywhere | Swipe ← or → | **ATK** button |
 | ⬚ **BUTTONS** | ◀ ▶ buttons (slide your thumb between them) | **JMP** | **DSH** + ◀ / ▶ | **ATK** |
 
 - The **ATK** and **DSH** buttons only appear once you've unlocked those powers, so the screen stays clean at the start.
-- TAP tip: on the second tap of a double-tap, keep your finger down — you'll jump *and* keep running that way.
+- TAP tips: jump again in midair the same way for a double jump. Hold your second tap down and you'll keep running that way after the jump.
 - TILT tips: however you're holding the phone when the run starts counts as "standing still". **MENU → RE-CENTER** if it drifts, **TILT: INVERTED** if it goes the wrong way. iPhone asks permission to use motion the first time — tap **Allow** (if you don't, the game switches to TAP).
 - For true fullscreen on iPhone, use Safari's **Share → Add to Home Screen** and open it from there. On Android it goes fullscreen when you tap to begin. On a computer, use the ⛶ button.
 
@@ -105,7 +105,7 @@ Hidden void stages can branch off from the main path. These secret levels are ti
 - **Boss encounters** — one boss per main level, with door locks and a boss prep pickup before the fight
 - **Objectives and checkpoints** — fruit, enemy, checkpoint, and boss goals gate level exits
 - **Hidden void routes** — timed secret stages with return doors, ticking pressure, and special pickups
-- **Persistent flight** — flying donuts now last until an enemy hit or fireball strips the wings away
+- **Donut wings** — a flying donut gives you wings for **5 seconds** (a pink bar over your head counts down and blinks near the end); a hit still knocks them off early. You can't fly off the top of the screen.
 - **Helper bot** — unlockable ally that follows you later in the game and can rescue you from a fall on cooldown
 - **Special fruits** — flying donuts, speed donuts, and power orbs
 - **Question boxes** — pop boxes from below to release stronger fruit rewards in a more intentional way
@@ -172,7 +172,7 @@ Your game will be live at `https://awakened-[hash].vercel.app`.
 - [x] Secret void routes with timers, ticking ambience, and return exits
 - [x] Checkpoints, helper bot rescue, and objective-based level flow
 - [x] Question boxes for special fruit rewards
-- [x] Persistent donut flight with power-down hazards
+- [x] Donut flight (5-second wings with countdown) with power-down hazards
 - [x] Stationary flower enemies with fireball attacks
 - [x] Stronger per-level world themes and clearer shuttle-style exits
 - [x] Tap / tilt / button phone controls, landscape prompt, first-run walkthrough
