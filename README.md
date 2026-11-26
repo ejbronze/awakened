@@ -8,7 +8,7 @@ Open `index.html` in any browser — no build step required. Live at [awakened-t
 
 ### First time playing?
 
-The first time you start a run, a short **How To Play** walkthrough appears (4 quick cards: Move → Jump → Get Stronger → Your Goal). It shows the controls for whatever you're playing on — keyboard, tilt, thumbstick or buttons.
+The first time you start a run, a short **How To Play** walkthrough appears (4 quick cards: Move → Jump → Get Stronger → Your Goal). It shows the controls for whatever you're playing on — keyboard, tap, tilt or buttons.
 
 - **Skip** it any time (SKIP button, or `Esc`). Flip cards with `← →` / `Enter`, or tap NEXT / BACK.
 - It only shows once. Replay it any time from **? HOW TO PLAY** on the start screen or in the pause menu.
