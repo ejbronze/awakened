@@ -4,9 +4,17 @@ A side-scrolling action platformer where you start as nobody and slowly become s
 
 ## Play
 
-Open `index.html` in any browser — no build step required.
+Open `index.html` in any browser — no build step required. Live at [awakened-three.vercel.app](https://awakened-three.vercel.app).
 
-## Controls
+### First time playing?
+
+The first time you start a run, a short **How To Play** walkthrough appears (4 quick cards: Move → Jump → Get Stronger → Your Goal). It shows the controls for whatever you're playing on — keyboard, tilt, thumbstick or buttons.
+
+- **Skip** it any time (SKIP button, or `Esc`). Flip cards with `← →` / `Enter`, or tap NEXT / BACK.
+- It only shows once. Replay it any time from **? HOW TO PLAY** on the start screen or in the pause menu.
+- Each new power also pops up a short tip the moment you unlock it.
+
+## Controls — keyboard
 
 | Key | Action |
 |-----|--------|
@@ -27,7 +35,24 @@ Open `index.html` in any browser — no build step required.
 | `U` | Attack |
 | `O` | Dash |
 
-Mobile: on-screen buttons appear automatically on touch devices. The touch controls are oversized for easier play, and the fullscreen toggle sits in the top-right so it does not overlap the jump area.
+## Controls — phones & tablets
+
+Play with the phone **sideways** (landscape). If you hold it upright, the game pauses and asks you to turn it.
+
+Pick a control style on the start screen (or any time from **MENU → CONTROLS**). Your choice is remembered.
+
+| Style | Move | Jump | Attack | Dash |
+|-------|------|------|--------|------|
+| 📱 **TILT** *(default)* | Tilt the phone left / right — a little to walk, more to sprint | Tap / hold the **right half** of the screen | Tap the **left half** | Swipe ← or → on the **left half** |
+| 🕹 **STICK** | Drag anywhere on the **left half** — a thumbstick appears under your thumb | Tap / hold the **right half** | **ATK** button | **DSH** button, or flick the stick quickly |
+| ⬚ **BUTTONS** | ◀ ▶ buttons (you can slide your thumb between them) | **JMP** button | **ATK** button | **DSH** + ◀ / ▶ |
+
+Tilt tips:
+
+- **However you're holding the phone when the run starts counts as "standing still"** — sitting, lying down, whatever is comfortable.
+- Tilt drifting? **MENU → RE-CENTER TILT**. Moving the wrong way? **MENU → TILT: INVERTED**.
+- On iPhone / iPad, Safari asks for permission to use motion the first time — tap **Allow**. If you say no (or the device has no motion sensor), the game switches to STICK automatically.
+- For true fullscreen on iPhone, use Safari's **Share → Add to Home Screen** and launch it from there. On Android the game goes fullscreen when you tap to begin.
 
 ## How to Score
 
@@ -41,10 +66,10 @@ Mobile: on-screen buttons appear automatically on touch devices. The touch contr
 
 | Level | Score | Unlocks |
 |-------|-------|---------|
-| 1 | Start | Run & jump |
-| 2 | 350 | Double jump + Punch |
+| 1 | Start | Run, jump, double jump, wall jump |
+| 2 | 350 | Punch |
 | 3 | 700 | Dash + Ranged shot |
-| 4 | 1050 | Wall climb + wall jump |
+| 4 | 1050 | Wall climb (slide slowly down walls) |
 | 5 | 1400 | Burst attack (8-directional) |
 
 ## Enemies
@@ -73,7 +98,9 @@ Hidden void stages can branch off from the main path. These secret levels are ti
 - **Character select with preview** — choose a hero before the run, with live preview art and appearance styles
 - **Distinct hero looks** — same core body shape, but each character has their own visual identity
 - **Accessible in-run menu** — persistent menu button, pause hub, restart flow, and character bay
-- **Mobile-friendly controls** — larger touch buttons and a safer fullscreen button position
+- **Phone controls built for touch** — tilt to move, or a floating thumbstick, or classic buttons; analog speed; haptic buzz when you get hit
+- **How To Play walkthrough** — skippable first-run guide that matches your control style, replayable from the menus
+- **Same speed on every screen** — the game runs at a fixed 60 updates/sec, so 120 Hz phones and iPads don't play double-speed
 - **Local co-op** — second player joins with shared score and power progression
 - **Boss encounters** — one boss per main level, with door locks and a boss prep pickup before the fight
 - **Objectives and checkpoints** — fruit, enemy, checkpoint, and boss goals gate level exits
@@ -148,3 +175,14 @@ Your game will be live at `https://awakened-[hash].vercel.app`.
 - [x] Persistent donut flight with power-down hazards
 - [x] Stationary flower enemies with fireball attacks
 - [x] Stronger per-level world themes and clearer shuttle-style exits
+- [x] Tilt / thumbstick phone controls, landscape prompt, first-run walkthrough
+- [x] Fixed-timestep game loop (consistent speed on 60/120/144 Hz screens)
+
+---
+
+## Notes for developers
+
+- **Game speed:** everything in `update()` is written "per frame" at 60 fps. The loop at the bottom of `index.html` runs `update()` on a fixed 60 Hz clock and draws as often as the screen refreshes — keep new speeds/timers in per-frame units and they'll stay consistent.
+- **Input:** read movement with `moveAxis()` (−1…1, analog on tilt/stick) and buttons with `isUp()` / `isAtk()` / `isDash()`. They already merge keyboard, on-screen buttons, tilt and touch zones.
+- **Control labels:** use `ctl('jump')`, `ctl('attack')`, etc. in any tutorial text so it says the right thing for keyboard vs. phone.
+- **Testing tilt on a laptop:** Chrome DevTools → ⋮ → More tools → **Sensors** lets you fake device orientation; use device mode (phone emulation) so the touch controls turn on.

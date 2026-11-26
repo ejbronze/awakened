@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <!-- "Add to Home Screen" opens the game fullscreen with no browser bars -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#0a0a0f" />
   <title>AWAKENED</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap" rel="stylesheet">
@@ -86,6 +91,10 @@
       pointer-events: none;
     }
     #hud .left, #hud .right { display: flex; flex-direction: column; gap: 4px; }
+    /* keep clear of the MENU button (top-left) and fullscreen button (top-right) */
+    #hud .left  { padding-top: 32px; }
+    #hud .right { padding-right: 28px; }
+    #missionBox { pointer-events: auto; }
     #hud .stat {
       font-family: 'Share Tech Mono', monospace;
       font-size: 12px;
@@ -121,6 +130,7 @@
       background: rgba(0,0,0,0.82);
       backdrop-filter: blur(2px);
     }
+    .screen { overflow-y: auto; justify-content: safe center; padding: 12px 0; touch-action: pan-y; }
     .screen.hidden { display: none; }
 
     .screen-title {
@@ -338,36 +348,159 @@
     #tutorial .tut-row { color: rgba(255,255,255,0.75); font-size: 11px; letter-spacing: 1px; margin: 2px 0; }
     #tutorial .tut-row b { color: var(--gold); font-weight: normal; }
 
-    /* Mobile controls */
+    /* ── Touch controls ───────────────────────────────────── */
+    body { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+    .touch-only { display: none; }
+    body.touch .touch-only { display: block; }
+    body.touch .keys-only { display: none; }
+
+    /* BUTTONS mode: classic pad, only while playing */
     #mobileControls {
       position: absolute; bottom: 0; left: 0; right: 0;
       display: none;
-      padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+      padding: 10px calc(14px + env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) calc(14px + env(safe-area-inset-left, 0px));
       justify-content: space-between;
       align-items: flex-end;
+      pointer-events: none;
     }
-    @media (pointer: coarse) { #mobileControls { display: flex; } }
-    .dpad { display: grid; grid-template-columns: 52px 52px 52px; grid-template-rows: 52px 52px; gap: 6px; }
+    body.ctl-buttons.playing #mobileControls { display: flex; }
+    .dpad { display: flex; gap: 10px; pointer-events: auto; }
     .mbtn {
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
-      border-radius: 10px;
-      color: #fff; font-size: 22px;
+      background: rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 12px;
+      color: rgba(255,255,255,0.85); font-size: 22px;
       display: flex; align-items: center; justify-content: center;
       cursor: pointer; user-select: none; touch-action: none;
       -webkit-tap-highlight-color: transparent;
-      min-width: 52px; min-height: 52px;
+      width: 64px; height: 64px;
+      transition: background 0.06s, transform 0.06s;
     }
-    .mbtn:active { background: rgba(255,255,255,0.25); }
-    .mbtn.action { width: 62px; height: 62px; font-size: 16px; border-radius: 50%; background: rgba(167,139,250,0.2); border-color: var(--purple); }
-    .action-btns { display: flex; gap: 12px; align-items: flex-end; }
-    @media (pointer: coarse) and (max-width: 760px) {
-      #hud { padding-top: 44px; }
-      #mobileControls { padding-left: 14px; padding-right: 14px; }
-      .dpad { grid-template-columns: 58px 58px 58px; grid-template-rows: 58px 58px; gap: 7px; }
-      .mbtn { min-width: 58px; min-height: 58px; font-size: 24px; }
-      .mbtn.action { width: 70px; height: 70px; font-size: 17px; }
+    .mbtn.pressed { background: rgba(255,255,255,0.32); transform: scale(0.94); }
+    .mbtn.action { width: 58px; height: 58px; font-size: 13px; letter-spacing: 1px; border-radius: 50%; background: rgba(167,139,250,0.18); border-color: var(--purple); }
+    .mbtn.action.jump { width: 72px; height: 72px; background: rgba(255,215,0,0.16); border-color: var(--gold); }
+    .mbtn.action.pressed { background: rgba(167,139,250,0.45); }
+    .action-btns { display: flex; gap: 10px; align-items: flex-end; pointer-events: auto; }
+
+    /* TILT / STICK modes: whole-screen touch zones, drawn outside the game box */
+    #touchUI { position: fixed; inset: 0; pointer-events: none; z-index: 30; display: none; }
+    body.playing.ctl-tilt #touchUI, body.playing.ctl-stick #touchUI { display: block; }
+    #stickBase {
+      position: absolute; display: none;
+      width: 104px; height: 104px; margin: -52px 0 0 -52px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.28);
+      background: radial-gradient(circle, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
     }
+    #stickKnob {
+      position: absolute; left: 50%; top: 50%;
+      width: 46px; height: 46px; margin: -23px 0 0 -23px;
+      border-radius: 50%; background: rgba(255,255,255,0.45);
+      box-shadow: 0 0 12px rgba(167,139,250,0.6);
+    }
+    #stickActions {
+      position: absolute; display: none; gap: 12px; align-items: flex-end;
+      right: calc(16px + env(safe-area-inset-right, 0px));
+      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+      pointer-events: auto;
+    }
+    body.ctl-stick #stickActions { display: flex; }
+    #tiltMeter {
+      position: absolute; display: none;
+      left: 50%; bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+      width: 120px; height: 6px; margin-left: -60px;
+      border-radius: 3px; background: rgba(255,255,255,0.14);
+    }
+    #tiltMeter::after { content: ''; position: absolute; left: 50%; top: -3px; width: 1px; height: 12px; background: rgba(255,255,255,0.35); }
+    body.ctl-tilt #tiltMeter { display: block; }
+    #tiltDot { position: absolute; top: -3px; left: 50%; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: var(--gold); transition: left 0.05s linear; }
+    /* first few seconds of a run: show what each half of the screen does */
+    #zoneHint {
+      position: absolute; inset: 0; display: flex; opacity: 0; transition: opacity 0.6s;
+      font-family: 'Share Tech Mono', monospace; font-size: 12px; letter-spacing: 2px; color: rgba(255,255,255,0.75);
+    }
+    #zoneHint.show { opacity: 1; }
+    #zoneHint span { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; line-height: 1.6; }
+    #zoneHint .zl { border-right: 1px dashed rgba(255,255,255,0.25); background: rgba(167,139,250,0.08); }
+    #zoneHint .zr { background: rgba(255,215,0,0.06); }
+
+    /* control picker on start + pause screens */
+    .ctl-picker { margin-top: 10px; text-align: center; }
+    .ctl-label { font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.45); margin-bottom: 5px; }
+    .ctl-options { display: flex; gap: 6px; justify-content: center; margin-top: 4px; }
+    .ctl-opt {
+      font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 1px;
+      color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;
+      padding: 7px 10px; cursor: pointer;
+    }
+    .ctl-opt.active { color: #0a0a0f; background: var(--gold); border-color: var(--gold); }
+
+    /* portrait phone: ask to rotate */
+    #rotateHint {
+      position: fixed; inset: 0; z-index: 100; display: none;
+      flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+      background: #0a0a0f; color: #fff; font-family: 'Share Tech Mono', monospace; letter-spacing: 3px; font-size: 14px; text-align: center; padding: 24px;
+    }
+    #rotateHint .rot-icon { font-size: 54px; animation: rotHint 2s ease-in-out infinite; }
+    #rotateHint .rot-sub { font-size: 10px; color: rgba(255,255,255,0.45); }
+    @keyframes rotHint { 0%,30% { transform: rotate(0deg); } 60%,100% { transform: rotate(-90deg); } }
+    @media (pointer: coarse) and (orientation: portrait) { #rotateHint { display: flex; } }
+
+    /* How To Play walkthrough */
+    #howToScreen { z-index: 25; }
+    .howto-card {
+      width: min(440px, 88%);
+      background: rgba(10,10,18,0.96);
+      border: 1px solid var(--purple); border-radius: 10px;
+      padding: 16px 20px 14px; text-align: center;
+      box-shadow: 0 0 40px rgba(167,139,250,0.25);
+    }
+    .howto-step { font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.4); }
+    .howto-icon { font-size: 34px; margin: 4px 0 2px; }
+    .howto-title { font-family: 'Bebas Neue', sans-serif; font-size: 30px; letter-spacing: 6px; color: #fff; }
+    .howto-body { margin-top: 6px; min-height: 84px; }
+    .howto-body .tut-row { color: rgba(255,255,255,0.78); font-size: 12px; letter-spacing: 1px; margin: 5px 0; line-height: 1.4; }
+    .howto-body b { color: var(--gold); font-weight: normal; }
+    .howto-dots { display: flex; gap: 6px; justify-content: center; margin: 10px 0 12px; }
+    .howto-dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+    .howto-dots i.on { background: var(--gold); }
+    .howto-actions { display: flex; gap: 8px; justify-content: center; }
+    .howto-btn {
+      font-family: 'Share Tech Mono', monospace; font-size: 13px; letter-spacing: 2px;
+      background: var(--gold); color: #0a0a0f; border: none; border-radius: 6px;
+      padding: 9px 18px; cursor: pointer; min-width: 92px;
+    }
+    .howto-btn.ghost { background: transparent; color: rgba(255,255,255,0.7); border: 1px solid rgba(255,255,255,0.25); }
+    .howto-btn:disabled { visibility: hidden; }
+    .howto-hint { margin-top: 10px; font-size: 9px; letter-spacing: 2px; color: rgba(255,255,255,0.3); }
+    .howto-link {
+      margin-top: 8px; font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 2px;
+      background: none; border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.65);
+      border-radius: 6px; padding: 6px 12px; cursor: pointer;
+    }
+    .howto-link:hover { color: #fff; border-color: rgba(255,255,255,0.5); }
+
+    /* small screens (phones in landscape): tighter HUD + scrollable menus */
+    #gameWrapper.compact #hud .stat { font-size: 10px; padding: 2px 7px; }
+    #gameWrapper.compact #missionBox { font-size: 9px; padding: 5px 7px; max-width: 200px; }
+    #gameWrapper.compact .screen-title { font-size: 40px; letter-spacing: 6px; }
+    #missionBox.collapsed #missionList { display: none; }
+    #missionBox.collapsed #missionTitle { margin-bottom: 0; }
+    /* phones: power-up tips go top-center so they never cover the player */
+    body.touch #tutorial { bottom: auto; top: 10px; }
+    #gameWrapper.compact .screen-sub { margin: 4px 0 10px; font-size: 10px; }
+    #gameWrapper.compact .controls-grid { margin-bottom: 8px; gap: 3px 14px; }
+    #gameWrapper.compact .ctrl { font-size: 10px; }
+    #gameWrapper.compact .char-select { margin-top: 4px; padding: 8px 10px; }
+    #gameWrapper.compact .char-preview-wrap { width: 70px; padding: 5px; margin-bottom: 6px; }
+    #gameWrapper.compact .char-name { font-size: 20px; }
+    #gameWrapper.compact .char-desc { margin-top: 3px; min-height: 0; font-size: 10px; }
+    #gameWrapper.compact .char-stats, #gameWrapper.compact .char-swatches { margin-top: 4px; }
+    #gameWrapper.compact .power-bar { margin: 8px 0 8px; }
+    #gameWrapper.compact .credits-block { margin-top: 8px; font-size: 9px; line-height: 1.4; }
+    #gameWrapper.compact .menu-btn { margin: 4px auto; }
+    #missionTitle { cursor: pointer; }
 
     /* Co-op indicator */
     #coopIndicator { font-size:11px; color:var(--purple); letter-spacing:3px; margin-top:-16px; margin-bottom:8px; display:none; }
@@ -523,7 +656,7 @@
   <div class="screen" id="startScreen">
     <div class="screen-title">AWAKENED</div>
     <div class="screen-sub">You are nobody. Run. Survive. Become.</div>
-    <div class="controls-grid">
+    <div class="controls-grid" id="controlsGrid">
       <div class="ctrl"><b>← → / A D</b> Move</div>
       <div class="ctrl"><b>Space / W</b> Jump</div>
       <div class="ctrl"><b>Shift</b> Dash (lv 3)</div>
@@ -547,8 +680,17 @@
         </div>
         <button class="char-btn" id="charNextBtn">›</button>
       </div>
-      <div class="char-help">LEFT / RIGHT TO CHOOSE</div>
+      <div class="char-help keys-only">LEFT / RIGHT TO CHOOSE</div>
     </div>
+    <div class="ctl-picker touch-only" data-ui>
+      <div class="ctl-label">CONTROLS</div>
+      <div class="ctl-options">
+        <button class="ctl-opt" data-ctl="tilt">📱 TILT</button>
+        <button class="ctl-opt" data-ctl="stick">🕹 STICK</button>
+        <button class="ctl-opt" data-ctl="buttons">⬚ BUTTONS</button>
+      </div>
+    </div>
+    <button class="howto-link" id="startHowToBtn" data-ui>? HOW TO PLAY</button>
     <div class="power-bar" id="startPowerBar">
       <div class="power-pip active"></div>
       <div class="power-pip"></div>
@@ -595,6 +737,19 @@
     <button class="menu-btn" onclick="restartGame()">↻ RESTART</button>
     <button class="menu-btn" onclick="saveGame()">💾 SAVE GAME</button>
     <button class="menu-btn" onclick="loadSave()">📂 LOAD SAVE</button>
+    <button class="menu-btn" onclick="openHowTo(false)">? HOW TO PLAY</button>
+    <div class="ctl-picker touch-only" data-ui>
+      <div class="ctl-label">CONTROLS</div>
+      <div class="ctl-options">
+        <button class="ctl-opt" data-ctl="tilt">📱 TILT</button>
+        <button class="ctl-opt" data-ctl="stick">🕹 STICK</button>
+        <button class="ctl-opt" data-ctl="buttons">⬚ BUTTONS</button>
+      </div>
+      <div class="ctl-options tilt-only">
+        <button class="ctl-opt" onclick="recenterTiltFromMenu()">◎ RE-CENTER TILT</button>
+        <button class="ctl-opt" id="tiltInvertBtn" onclick="toggleTiltInvert()">⇆ TILT: NORMAL</button>
+      </div>
+    </div>
     <button class="menu-btn" onclick="toggleEditor()">✏ LEVEL EDITOR</button>
     <button class="menu-btn danger" onclick="quitToMenu()">✕ QUIT TO MENU</button>
     <div class="menu-section">
@@ -618,7 +773,24 @@
       </div>
       <div class="menu-note">Appearance updates live. Character class changes apply on your next run.</div>
     </div>
-    <div style="margin-top:16px; font-size:10px; color:rgba(255,255,255,0.3); letter-spacing:2px;">ESC TO RESUME</div>
+    <div class="keys-only" style="margin-top:16px; font-size:10px; color:rgba(255,255,255,0.3); letter-spacing:2px;">ESC TO RESUME</div>
+  </div>
+
+  <!-- How To Play walkthrough (shown once on the first run; skippable; replay from menu) -->
+  <div class="screen hidden" id="howToScreen" data-ui>
+    <div class="howto-card">
+      <div class="howto-step" id="howToStep">1 / 4</div>
+      <div class="howto-icon" id="howToIcon">🏃</div>
+      <div class="howto-title" id="howToTitle">MOVE</div>
+      <div class="howto-body" id="howToBody"></div>
+      <div class="howto-dots" id="howToDots"></div>
+      <div class="howto-actions">
+        <button class="howto-btn ghost" id="howToSkip">SKIP</button>
+        <button class="howto-btn ghost" id="howToBack">BACK</button>
+        <button class="howto-btn" id="howToNext">NEXT ›</button>
+      </div>
+      <div class="howto-hint keys-only">← → TO FLIP · ESC TO SKIP</div>
+    </div>
   </div>
 
   <!-- Editor Toolbar -->
@@ -635,23 +807,31 @@
     <button class="ed-btn" onclick="toggleEditor()">EXIT[ESC]</button>
   </div>
 
-  <!-- Mobile Controls -->
-  <div id="mobileControls">
+  <!-- Classic button controls ("BUTTONS" mode) -->
+  <div id="mobileControls" data-ui>
     <div class="dpad">
-      <div></div>
-      <div class="mbtn" id="mUp">↑</div>
-      <div></div>
-      <div class="mbtn" id="mLeft">←</div>
-      <div class="mbtn" id="mDown">↓</div>
-      <div class="mbtn" id="mRight">→</div>
+      <div class="mbtn" id="mLeft" data-key="left">◀</div>
+      <div class="mbtn" id="mRight" data-key="right">▶</div>
     </div>
     <div class="action-btns">
-      <div class="mbtn action" id="mDash">DSH</div>
-      <div class="mbtn action" id="mAtk">ATK</div>
-      <div class="mbtn action" id="mJump">JMP</div>
+      <div class="mbtn action" id="mDash" data-key="dash">DSH</div>
+      <div class="mbtn action" id="mAtk" data-key="atk">ATK</div>
+      <div class="mbtn action jump" id="mJump" data-key="up">JMP</div>
     </div>
   </div>
 </div>
+
+<!-- Tilt / thumbstick UI lives outside the game box so it can use the black side bars on wide phones -->
+<div id="touchUI">
+  <div id="stickBase"><div id="stickKnob"></div></div>
+  <div id="stickActions" data-ui>
+    <div class="mbtn action" id="tDash" data-key="dash">DSH</div>
+    <div class="mbtn action" id="tAtk" data-key="atk">ATK</div>
+  </div>
+  <div id="tiltMeter"><div id="tiltDot"></div></div>
+  <div id="zoneHint"><span class="zl" id="zoneHintL">TAP: ATTACK<br>SWIPE: DASH</span><span class="zr">TAP: JUMP</span></div>
+</div>
+<div id="rotateHint"><div class="rot-icon">📱↻</div><div>TURN YOUR PHONE SIDEWAYS</div><div class="rot-sub">AWAKENED plays in landscape</div></div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -667,6 +847,8 @@ const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const NATIVE_W = 700, NATIVE_H = 420;
 canvas.width = NATIVE_W; canvas.height = NATIVE_H;
+// Phones/tablets (finger instead of mouse). Drives touch controls and tap-vs-key wording.
+const isTouchDevice = window.matchMedia('(pointer: coarse)').matches;
 const W = NATIVE_W, H = NATIVE_H;
 
 // ─────────────────────────────────────────────
@@ -681,6 +863,7 @@ function fitGame() {
   const gh = Math.floor(NATIVE_H * scale);
   wrapper.style.width  = gw + 'px';
   wrapper.style.height = gh + 'px';
+  wrapper.classList.toggle('compact', gh < 380);
 }
 fitGame();
 window.addEventListener('resize', () => { fitGame(); sizeConfettiCanvas?.(); });
@@ -1316,7 +1499,21 @@ function updateMissionUI() {
     const count = g.target > 1 ? ` ${g.current}/${g.target}` : '';
     return `<div class="mission-row${g.done ? ' done' : ''}">${prefix} ${g.label}${count}</div>`;
   }).join('');
+  const done = keys.filter(k => levelGoals[k].done).length;
+  const box = document.getElementById('missionBox');
+  const collapsed = box && box.classList.contains('collapsed');
+  document.getElementById('missionTitle').textContent = `OBJECTIVES ${done}/${keys.length} ${collapsed ? '▸' : '▾'}`;
 }
+// Tap the OBJECTIVES title to fold the list away (starts folded on phones so it doesn't cover the level)
+(function setupMissionToggle() {
+  const box = document.getElementById('missionBox');
+  if (isTouchDevice) box.classList.add('collapsed');
+  document.getElementById('missionTitle').addEventListener('click', e => {
+    e.stopPropagation();
+    box.classList.toggle('collapsed');
+    updateMissionUI();
+  });
+})();
 
 function applyCharacterLoadout(fullHeal=false) {
   const available = getSelectableCharacters();
@@ -1664,6 +1861,13 @@ const keys = {};
 const mobileKeys = {};
 document.addEventListener('keydown', e => {
   if (['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) e.preventDefault();
+  if (!document.getElementById('howToScreen').classList.contains('hidden')) {
+    if (['ArrowRight','Enter','Space','KeyD'].includes(e.code)) howToStep(1);
+    else if (['ArrowLeft','KeyA'].includes(e.code)) howToStep(-1);
+    else if (e.code === 'Escape') closeHowTo();
+    e.preventDefault();
+    return;                      // don't let these keys leak into the game/menus
+  }
   keys[e.code] = true;
   if (state === 'start' && !e.metaKey && !e.ctrlKey && !e.altKey) handleArchitectCodeInput(e.key);
   if (state === 'intro' && ['Space','Enter','Escape','KeyZ','KeyX'].includes(e.code)) {
@@ -1697,20 +1901,296 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { keys[e.code]=false; });
 
-function bindMobileBtn(id, keyName) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.addEventListener('touchstart', e=>{ e.preventDefault(); mobileKeys[keyName]=true; }, {passive:false});
-  el.addEventListener('touchend',   e=>{ e.preventDefault(); mobileKeys[keyName]=false; }, {passive:false});
-  el.addEventListener('mousedown',  e=>{ mobileKeys[keyName]=true; });
-  el.addEventListener('mouseup',    e=>{ mobileKeys[keyName]=false; });
+// ─────────────────────────────────────────────
+//  TOUCH CONTROLS (phones / tablets)
+//  Three modes, picked on the start screen or in the pause menu:
+//   • tilt    — tilt the phone to run. Hold RIGHT side = jump.
+//               Tap LEFT side = attack, swipe ← / → on the left = dash.
+//   • stick   — floating thumbstick on the LEFT half, RIGHT half = jump,
+//               small ATK / DSH buttons bottom-right (flicking the stick also dashes).
+//   • buttons — the classic on-screen ◀ ▶ + action buttons.
+// ─────────────────────────────────────────────
+// (isTouchDevice is defined near the top of the script)
+const CONTROL_MODES = ['tilt', 'stick', 'buttons'];
+let controlMode = 'keys';
+if (isTouchDevice) {
+  let saved = null;
+  try { saved = localStorage.getItem('awakened_controls'); } catch (_) {}
+  controlMode = CONTROL_MODES.includes(saved) ? saved : 'tilt';
 }
-bindMobileBtn('mLeft','left'); bindMobileBtn('mRight','right');
-bindMobileBtn('mUp','up'); bindMobileBtn('mJump','up');
-bindMobileBtn('mAtk','atk'); bindMobileBtn('mDash','dash');
+let tiltInvert = false;
+try { tiltInvert = localStorage.getItem('awakened_tilt_invert') === '1'; } catch (_) {}
 
-document.getElementById('startScreen').addEventListener('click', ()=>{ if(state==='start') startGame(); });
-document.getElementById('deathScreen').addEventListener('click', ()=>{ if(state==='dead')  startGame(); });
+const zoneKeys = { up:false };              // held by touch zones
+const touchLatch = { up:0, atk:0, dash:0, dashDir:0 }; // short taps/swipes survive until update() sees them
+let touchAxis = 0;                           // -1..1 from tilt or stick
+
+function setControlMode(mode, persist = true) {
+  if (!CONTROL_MODES.includes(mode)) return;
+  controlMode = mode;
+  if (persist) { try { localStorage.setItem('awakened_controls', mode); } catch (_) {} }
+  clearAllInput();
+  if (mode === 'tilt') startTilt();           // called from a tap, so iOS can show its permission prompt
+  syncControlUI();
+}
+
+function syncControlUI() {
+  const b = document.body;
+  b.classList.toggle('touch', isTouchDevice);
+  CONTROL_MODES.forEach(m => b.classList.toggle('ctl-' + m, isTouchDevice && controlMode === m));
+  document.querySelectorAll('[data-ctl]').forEach(btn => btn.classList.toggle('active', btn.dataset.ctl === controlMode));
+  document.querySelectorAll('.tilt-only').forEach(el => el.style.display = controlMode === 'tilt' ? '' : 'none');
+  const inv = document.getElementById('tiltInvertBtn');
+  if (inv) inv.textContent = tiltInvert ? '⇆ TILT: INVERTED' : '⇆ TILT: NORMAL';
+  renderControlHelp();
+}
+
+// Short label for an action in the player's current control scheme (used by tutorials/help).
+function ctl(action) {
+  const t = isTouchDevice ? controlMode : 'keys';
+  const L = {
+    keys:    { move:'← → / A D', jump:'Space / W', attack:'Z / X', dash:'Shift + ← →', pause:'Esc / M' },
+    tilt:    { move:'Tilt phone', jump:'Tap right side', attack:'Tap left side', dash:'Swipe ← → on left side', pause:'MENU button' },
+    stick:   { move:'Left thumbstick', jump:'Tap right side', attack:'ATK button', dash:'DSH button or flick stick', pause:'MENU button' },
+    buttons: { move:'◀ ▶ buttons', jump:'JMP button', attack:'ATK button', dash:'DSH + ◀ ▶', pause:'MENU button' },
+  };
+  return (L[t] || L.keys)[action] || action;
+}
+
+function renderControlHelp() {
+  const grid = document.getElementById('controlsGrid');
+  if (!grid) return;
+  const rows = [
+    ['move', 'Move'], ['jump', 'Jump (again midair = double)'],
+    ['attack', 'Attack (lv 2)'], ['dash', 'Dash (lv 3)'],
+  ];
+  let html = rows.map(([a, label]) => `<div class="ctrl"><b>${ctl(a)}</b> ${label}</div>`).join('');
+  if (!isTouchDevice) html += '<div class="ctrl"><b>Tab</b> Toggle Co-op</div><div class="ctrl"><b>P2: I J K L + U O</b></div>';
+  grid.innerHTML = html;
+  const verb = isTouchDevice ? 'TAP' : 'PRESS SPACE';
+  const startCta = document.querySelector('#startScreen .cta');
+  if (startCta) startCta.textContent = `${verb} TO BEGIN`;
+}
+function ctaText(rest) { return `${isTouchDevice ? 'TAP' : 'PRESS SPACE'} TO ${rest}`; }
+
+// ---------- tilt ----------
+let tiltListening = false, tiltNeutral = null, tiltSmooth = 0, tiltLastEvent = 0, tiltCheckTimer = null;
+function screenAngle() {
+  const a = (screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : (window.orientation || 0);
+  return ((a % 360) + 360) % 360;
+}
+function onDeviceOrientation(e) {
+  if (e.beta == null || e.gamma == null) return;
+  tiltLastEvent = performance.now();
+  // gravity direction in device coordinates, from beta/gamma
+  const b = e.beta * Math.PI / 180, g = e.gamma * Math.PI / 180;
+  const gx = Math.cos(b) * Math.sin(g), gy = -Math.sin(b);
+  // how much gravity points toward the RIGHT edge of the screen as the player sees it
+  const a = screenAngle();
+  const s = a === 90 ? -gy : a === 270 ? gy : a === 180 ? -gx : gx;
+  const deg = Math.asin(Math.max(-1, Math.min(1, s))) * 180 / Math.PI;
+  if (tiltNeutral === null) tiltNeutral = deg;   // calibrate: however they hold it = standing still
+  let d = deg - tiltNeutral;
+  if (tiltInvert) d = -d;
+  const DEAD = 3, FULL = 16;                      // degrees
+  const target = Math.abs(d) < DEAD ? 0 : Math.sign(d) * Math.min(1, (Math.abs(d) - DEAD) / (FULL - DEAD));
+  tiltSmooth += (target - tiltSmooth) * 0.5;
+  if (target === 0 && Math.abs(tiltSmooth) < 0.06) tiltSmooth = 0;
+  if (controlMode === 'tilt') touchAxis = tiltSmooth;
+  const dot = document.getElementById('tiltDot');
+  if (dot) dot.style.left = (50 + tiltSmooth * 46) + '%';
+}
+function requestTiltPermission() {
+  // iPhone/iPad: must be called straight from a tap, and the player has to press "Allow"
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    return DeviceOrientationEvent.requestPermission().then(r => r === 'granted').catch(() => false);
+  }
+  return Promise.resolve(typeof DeviceOrientationEvent !== 'undefined');
+}
+function startTilt() {
+  if (!isTouchDevice) return;
+  requestTiltPermission().then(ok => {
+    if (!tiltListening) { window.addEventListener('deviceorientation', onDeviceOrientation); tiltListening = true; }
+    recenterTilt();
+    clearTimeout(tiltCheckTimer);
+    // Only give up on tilt if the sensor really isn't sending anything
+    tiltCheckTimer = setTimeout(() => {
+      if (controlMode === 'tilt' && performance.now() - tiltLastEvent > 1500)
+        fallbackToStick(ok ? 'NO TILT SENSOR — USING THUMBSTICK' : 'TILT NOT ALLOWED — USING THUMBSTICK');
+    }, 1800);
+  });
+}
+function recenterTilt() { tiltNeutral = null; tiltSmooth = 0; if (controlMode === 'tilt') touchAxis = 0; }
+function recenterTiltFromMenu() { recenterTilt(); showToast('TILT CENTERED'); }
+function toggleTiltInvert() {
+  tiltInvert = !tiltInvert;
+  try { localStorage.setItem('awakened_tilt_invert', tiltInvert ? '1' : '0'); } catch (_) {}
+  recenterTilt(); syncControlUI();
+}
+function fallbackToStick(msg) {
+  if (controlMode !== 'tilt') return;
+  setControlMode('stick', false);
+  showToast(msg);
+}
+screen.orientation?.addEventListener('change', recenterTilt);
+
+// ---------- on-screen buttons (buttons mode + stick-mode ATK/DSH) ----------
+// A finger can slide from one button to another (◀ to ▶) and it follows.
+const btnPointers = new Map();   // pointerId -> key name or null
+function keyUnder(x, y) {
+  const el = document.elementFromPoint(x, y);
+  const b = el && el.closest ? el.closest('[data-key]') : null;
+  return b && b.offsetParent !== null ? b.dataset.key : null;
+}
+function refreshBtnKeys() {
+  const before = { ...mobileKeys };
+  ['left','right','up','atk','dash'].forEach(k => mobileKeys[k] = false);
+  btnPointers.forEach(k => { if (k) mobileKeys[k] = true; });
+  // a press that starts and ends between two updates still counts
+  if (mobileKeys.up && !before.up) touchLatch.up = 2;
+  if (mobileKeys.atk && !before.atk) touchLatch.atk = 2;
+  if (mobileKeys.dash && !before.dash) touchLatch.dash = 3;
+  document.querySelectorAll('[data-key]').forEach(el => el.classList.toggle('pressed', !!mobileKeys[el.dataset.key]));
+}
+
+// ---------- touch zones (tilt + stick modes) ----------
+const zonePointers = new Map();  // pointerId -> { side, x0, y0, t0, dashed }
+let stickId = null, stickOrigin = null, stickLeftDeadAt = 0, stickFlicked = false;
+const STICK_RADIUS = 52;
+function zonesActive() { return isTouchDevice && state === 'play' && (controlMode === 'tilt' || controlMode === 'stick'); }
+function refreshZoneJump() {
+  const holding = [...zonePointers.values()].some(z => z.side === 'R');
+  if (holding && !zoneKeys.up) touchLatch.up = 2;
+  zoneKeys.up = holding;
+}
+function showStick(x, y, kx, ky) {
+  const base = document.getElementById('stickBase'), knob = document.getElementById('stickKnob');
+  if (!base) return;
+  base.style.display = 'block';
+  base.style.left = x + 'px'; base.style.top = y + 'px';
+  knob.style.transform = `translate(${kx}px, ${ky}px)`;
+}
+function hideStick() { const base = document.getElementById('stickBase'); if (base) base.style.display = 'none'; }
+
+const UI_SELECTOR = 'button, input, a, .menu-btn, #missionBox, [data-ui], .screen:not(.hidden)';
+document.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'touch' && e.pointerType !== 'pen') return;
+  const target = e.target;
+  if (target.closest && target.closest('[data-key]')) {
+    e.preventDefault();
+    btnPointers.set(e.pointerId, target.closest('[data-key]').dataset.key);
+    try { target.releasePointerCapture?.(e.pointerId); } catch (_) {}
+    refreshBtnKeys();
+    return;
+  }
+  if (!zonesActive() || (target.closest && target.closest(UI_SELECTOR))) return;
+  e.preventDefault();
+  const side = e.clientX < window.innerWidth / 2 ? 'L' : 'R';
+  const z = { side, x0: e.clientX, y0: e.clientY, t0: performance.now(), dashed: false };
+  if (side === 'L') {
+    if (controlMode === 'tilt') {
+      touchLatch.atk = 2;                       // tap left = attack
+    } else if (stickId === null) {                // stick mode: thumbstick appears under the thumb
+      stickId = e.pointerId; stickOrigin = { x: e.clientX, y: e.clientY };
+      stickLeftDeadAt = 0; stickFlicked = false;
+      showStick(e.clientX, e.clientY, 0, 0);
+    }
+  }
+  zonePointers.set(e.pointerId, z);
+  refreshZoneJump();
+}, { passive: false });
+
+document.addEventListener('pointermove', e => {
+  if (btnPointers.has(e.pointerId)) {
+    const k = keyUnder(e.clientX, e.clientY);
+    if (k !== btnPointers.get(e.pointerId)) { btnPointers.set(e.pointerId, k); refreshBtnKeys(); }
+    return;
+  }
+  const z = zonePointers.get(e.pointerId);
+  if (!z) return;
+  const dx = e.clientX - z.x0, dy = e.clientY - z.y0;
+  if (controlMode === 'tilt' && z.side === 'L' && !z.dashed &&
+      Math.abs(dx) > 36 && Math.abs(dx) > Math.abs(dy) * 1.3 && performance.now() - z.t0 < 350) {
+    z.dashed = true;                              // swipe on the left = dash that way
+    touchLatch.dash = 3; touchLatch.dashDir = Math.sign(dx);
+  }
+  if (controlMode === 'stick' && e.pointerId === stickId) {
+    let sx = e.clientX - stickOrigin.x, sy = e.clientY - stickOrigin.y;
+    const len = Math.hypot(sx, sy);
+    if (len > STICK_RADIUS) {
+      // drag past the edge and the stick follows your thumb (no "dead" thumb)
+      stickOrigin.x += sx * (1 - STICK_RADIUS / len); stickOrigin.y += sy * (1 - STICK_RADIUS / len);
+      sx = e.clientX - stickOrigin.x; sy = e.clientY - stickOrigin.y;
+    }
+    const raw = sx / STICK_RADIUS;
+    const DEAD = 0.18;
+    const axis = Math.abs(raw) < DEAD ? 0 : Math.sign(raw) * Math.min(1, (Math.abs(raw) - DEAD) / (1 - DEAD));
+    if (axis !== 0 && touchAxis === 0) stickLeftDeadAt = performance.now();
+    if (Math.abs(axis) < 0.3) stickFlicked = false;
+    if (!stickFlicked && Math.abs(axis) >= 0.98 && performance.now() - stickLeftDeadAt < 130) {
+      stickFlicked = true; touchLatch.dash = 3; touchLatch.dashDir = Math.sign(axis);  // quick flick = dash
+    }
+    touchAxis = axis;
+    showStick(stickOrigin.x, stickOrigin.y, sx, sy);
+  }
+}, { passive: true });
+
+function endPointer(e) {
+  if (btnPointers.delete(e.pointerId)) { refreshBtnKeys(); return; }
+  if (!zonePointers.delete(e.pointerId)) return;
+  if (e.pointerId === stickId) { stickId = null; if (controlMode === 'stick') touchAxis = 0; hideStick(); }
+  refreshZoneJump();
+}
+document.addEventListener('pointerup', endPointer);
+document.addEventListener('pointercancel', endPointer);   // e.g. a notification steals the touch
+document.addEventListener('contextmenu', e => { if (isTouchDevice) e.preventDefault(); });
+
+function clearAllInput() {
+  Object.keys(keys).forEach(k => keys[k] = false);
+  Object.keys(mobileKeys).forEach(k => mobileKeys[k] = false);
+  btnPointers.clear(); zonePointers.clear();
+  zoneKeys.up = false;
+  touchLatch.up = touchLatch.atk = touchLatch.dash = touchLatch.dashDir = 0;
+  stickId = null; hideStick();
+  if (controlMode !== 'tilt') touchAxis = 0;
+  document.querySelectorAll('[data-key].pressed').forEach(el => el.classList.remove('pressed'));
+}
+// Releasing keys while the window isn't focused never reaches us — so clear on blur,
+// and pause when the tab/app goes to the background.
+window.addEventListener('blur', clearAllInput);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { clearAllInput(); if (state === 'play') pauseGame(); }
+});
+// Phone turned to portrait mid-game → pause (the rotate hint covers the screen)
+const portraitQuery = window.matchMedia('(orientation: portrait)');
+function onPortraitChange() { if (isTouchDevice && portraitQuery.matches && state === 'play') pauseGame(); }
+portraitQuery.addEventListener ? portraitQuery.addEventListener('change', onPortraitChange) : portraitQuery.addListener(onPortraitChange);
+
+function tickTouchLatches() {
+  if (touchLatch.up > 0) touchLatch.up--;
+  if (touchLatch.atk > 0) touchLatch.atk--;
+  if (touchLatch.dash > 0) touchLatch.dash--; else touchLatch.dashDir = 0;
+}
+
+// Things a tap on the start/death screen should do on phones before the run begins.
+function prepareTouchRun() {
+  if (!isTouchDevice) return;
+  if (controlMode === 'tilt') startTilt(); else recenterTilt();
+  // Android: go fullscreen + lock landscape (iPhone Safari doesn't allow this; "Add to Home Screen" does)
+  const el = document.documentElement;
+  if (!document.fullscreenElement && el.requestFullscreen) {
+    el.requestFullscreen().then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+  }
+}
+
+document.querySelectorAll('[data-ctl]').forEach(btn => btn.addEventListener('click', e => {
+  e.stopPropagation(); setControlMode(btn.dataset.ctl);
+}));
+document.querySelectorAll('.ctl-picker').forEach(el => el.addEventListener('click', e => e.stopPropagation()));
+syncControlUI();
+
+document.getElementById('startScreen').addEventListener('click', ()=>{ if(state==='start') { prepareTouchRun(); startGame(); } });
+document.getElementById('deathScreen').addEventListener('click', ()=>{ if(state==='dead') { prepareTouchRun(); startGame(); } });
 document.querySelector('#startScreen .char-select').addEventListener('click', e => e.stopPropagation());
 document.getElementById('charPrevBtn').addEventListener('click', e => { e.stopPropagation(); cycleCharacter(-1); });
 document.getElementById('charNextBtn').addEventListener('click', e => { e.stopPropagation(); cycleCharacter(1); });
@@ -1722,11 +2202,19 @@ document.getElementById('menuHubBtn').addEventListener('click', () => {
 });
 wrapper.addEventListener('pointerdown', () => { if (state === 'intro') trySkipWakeIntro(); });
 
-function isLeft()  { return keys['ArrowLeft']||keys['KeyA']||mobileKeys['left']; }
-function isRight() { return keys['ArrowRight']||keys['KeyD']||mobileKeys['right']; }
-function isUp()    { return keys['ArrowUp']||keys['KeyW']||keys['Space']||mobileKeys['up']; }
-function isDash()  { return keys['ShiftLeft']||keys['ShiftRight']||mobileKeys['dash']; }
-function isAtk()   { return keys['KeyZ']||keys['KeyX']||mobileKeys['atk']; }
+function digitalLeft()  { return !!(keys['ArrowLeft']||keys['KeyA']||mobileKeys['left']); }
+function digitalRight() { return !!(keys['ArrowRight']||keys['KeyD']||mobileKeys['right']); }
+function isLeft()  { return digitalLeft()  || touchAxis < 0 || (touchLatch.dash > 0 && touchLatch.dashDir < 0); }
+function isRight() { return digitalRight() || touchAxis > 0 || (touchLatch.dash > 0 && touchLatch.dashDir > 0); }
+function isUp()    { return !!(keys['ArrowUp']||keys['KeyW']||keys['Space']||mobileKeys['up']||zoneKeys.up||touchLatch.up > 0); }
+function isDash()  { return !!(keys['ShiftLeft']||keys['ShiftRight']||mobileKeys['dash']||touchLatch.dash > 0); }
+function isAtk()   { return !!(keys['KeyZ']||keys['KeyX']||mobileKeys['atk']||touchLatch.atk > 0); }
+// -1..1 run direction. Keys/buttons are all-or-nothing; tilt and stick are analog (gentle tilt = walk).
+function moveAxis() {
+  const l = digitalLeft(), r = digitalRight();
+  if (l || r) return r ? 1 : -1;            // same as before: right wins if both are held
+  return touchAxis;
+}
 
 function startWakeIntro() {
   introTimer = 0;
@@ -1749,8 +2237,95 @@ function finishWakeIntro(skipped=false) {
   document.getElementById('menuHubBtn').classList.add('show');
   startMusic();
   if (skipped) showToast('INTRO SKIPPED');
-  setTimeout(()=>showTutorial(WALL_JUMP_TUT), 2200);
+  if (!howToSeen()) openHowTo(true);       // first run: quick, skippable walkthrough
+  else afterHowTo();
 }
+
+// ─────────────────────────────────────────────
+//  HOW TO PLAY walkthrough
+//  Shown once (first run), skippable at any time, replayable from the
+//  start screen or pause menu. Text adapts to keyboard / tilt / stick / buttons.
+// ─────────────────────────────────────────────
+let howToPage = 0, howToFromRunStart = false, howToReturnState = 'play';
+function howToSeen() { try { return localStorage.getItem('awakened_howto_seen') === '1'; } catch (_) { return true; } }
+function howToPages() {
+  const tilt = isTouchDevice && controlMode === 'tilt';
+  return [
+    { icon:'🏃', title:'MOVE', rows: [
+      `<b>${ctl('move')}</b> to run`,
+      tilt ? 'Hold the phone however feels comfy — that angle counts as "standing still". Tilt a little to walk, more to sprint.'
+           : 'Your score only climbs while you keep moving — so keep going!',
+      tilt ? 'Tilt feels off? Pause → <b>RE-CENTER TILT</b>, or switch to <b>STICK</b>.' : '' ] },
+    { icon:'⤴', title:'JUMP', rows: [
+      `<b>${ctl('jump')}</b> to jump`,
+      'Jump again in midair for a <b>double jump</b>',
+      'Jump into a wall, then jump again to <b>wall jump</b> off it',
+      'Land on enemies\' heads to <b>stomp</b> them' ] },
+    { icon:'⚡', title:'GET STRONGER', rows: [
+      'Your score unlocks new powers:',
+      '<b>350</b> Punch · <b>700</b> Dash + Shots',
+      '<b>1050</b> Wall climb · <b>1400</b> Burst attack',
+      `Attack: <b>${ctl('attack')}</b> · Dash: <b>${ctl('dash')}</b>` ] },
+    { icon:'🎯', title:'YOUR GOAL', rows: [
+      'Finish the <b>OBJECTIVES</b> in the top-left corner',
+      'Grab fruit, touch checkpoints, beat the boss',
+      'Then board the door to the next world',
+      `Pause anytime: <b>${ctl('pause')}</b> — this guide is in the menu` ] },
+  ];
+}
+function renderHowTo() {
+  const pages = howToPages();
+  const p = pages[howToPage];
+  document.getElementById('howToStep').textContent = `${howToPage + 1} / ${pages.length}`;
+  document.getElementById('howToIcon').textContent = p.icon;
+  document.getElementById('howToTitle').textContent = p.title;
+  document.getElementById('howToBody').innerHTML = p.rows.filter(Boolean).map(r => `<div class="tut-row">${r}</div>`).join('');
+  document.getElementById('howToDots').innerHTML = pages.map((_, i) => `<i class="${i === howToPage ? 'on' : ''}"></i>`).join('');
+  document.getElementById('howToBack').disabled = howToPage === 0;
+  document.getElementById('howToNext').textContent = howToPage === pages.length - 1 ? "LET'S GO ›" : 'NEXT ›';
+}
+function openHowTo(fromRunStart) {
+  howToFromRunStart = fromRunStart;
+  howToReturnState = state;
+  howToPage = 0;
+  if (state === 'play') { state = 'howto'; clearAllInput(); }
+  document.getElementById('pauseScreen').classList.add('hidden');
+  document.getElementById('howToScreen').classList.remove('hidden');
+  renderHowTo();
+}
+function closeHowTo() {
+  try { localStorage.setItem('awakened_howto_seen', '1'); } catch (_) {}
+  document.getElementById('howToScreen').classList.add('hidden');
+  clearAllInput();
+  if (howToReturnState === 'paused') {
+    document.getElementById('pauseScreen').classList.remove('hidden');
+  } else if (howToReturnState === 'play') {
+    state = 'play';
+    recenterTilt();
+  }
+  if (howToFromRunStart) afterHowTo();
+}
+function howToStep(dir) {
+  const n = howToPages().length;
+  howToPage += dir;
+  if (howToPage >= n) { closeHowTo(); return; }
+  howToPage = Math.max(0, howToPage);
+  renderHowTo();
+}
+// Runs once the player is actually in control at the start of a run.
+function afterHowTo() {
+  if (isTouchDevice && (controlMode === 'tilt' || controlMode === 'stick')) {
+    const hint = document.getElementById('zoneHint');
+    document.getElementById('zoneHintL').innerHTML = controlMode === 'tilt' ? 'TAP: ATTACK<br>SWIPE: DASH' : 'DRAG: MOVE';
+    hint.classList.add('show');
+    setTimeout(() => hint.classList.remove('show'), 2600);
+  }
+  setTimeout(()=>{ if (state === 'play') showTutorial(wallJumpTut()); }, 2200);
+}
+document.getElementById('howToNext').addEventListener('click', e => { e.stopPropagation(); howToStep(1); });
+document.getElementById('howToBack').addEventListener('click', e => { e.stopPropagation(); howToStep(-1); });
+document.getElementById('howToSkip').addEventListener('click', e => { e.stopPropagation(); closeHowTo(); });
+document.getElementById('startHowToBtn').addEventListener('click', e => { e.stopPropagation(); openHowTo(false); });
 
 function trySkipWakeIntro() {
   if (state !== 'intro') return false;
@@ -1795,13 +2370,17 @@ function quitToMenu() {
 
 function pauseGame() {
   state = 'paused';
+  clearAllInput();
   audioCtx.suspend();
   document.getElementById('pauseScreen').classList.remove('hidden');
   updateCharacterSelectUI();
 }
 
 function resumeGame() {
+  if (isTouchDevice && portraitQuery.matches) return;   // stay paused until the phone is turned sideways
   state = 'play';
+  clearAllInput();
+  recenterTilt();
   audioCtx.resume();
   document.getElementById('pauseScreen').classList.add('hidden');
 }
@@ -1849,7 +2428,7 @@ function showDeathFinal() {
   const titleEl = document.querySelector('#deathScreen .screen-title');
   const ctaEl = document.querySelector('#deathScreen .cta');
   if (titleEl) titleEl.textContent = 'YOU LOST';
-  if (ctaEl) ctaEl.textContent = 'PRESS SPACE TO TRY AGAIN';
+  if (ctaEl) ctaEl.textContent = ctaText('TRY AGAIN');
   const isNew = score > 0 && leaderboard.length > 0 && leaderboard[0].score === score;
   document.getElementById('deathScoreUI').textContent = score;
   document.getElementById('newBestUI').classList.toggle('hidden', !isNew);
@@ -1867,7 +2446,7 @@ function showVictoryFinal() {
   const titleEl = document.querySelector('#deathScreen .screen-title');
   const ctaEl = document.querySelector('#deathScreen .cta');
   if (titleEl) titleEl.textContent = 'YOU ASCENDED';
-  if (ctaEl) ctaEl.textContent = 'PRESS SPACE TO RUN AGAIN';
+  if (ctaEl) ctaEl.textContent = ctaText('RUN AGAIN');
   document.getElementById('deathScoreUI').textContent = score;
   document.getElementById('newBestUI').classList.remove('hidden');
   document.getElementById('newBestUI').textContent = 'RUN COMPLETE!';
@@ -1925,14 +2504,17 @@ function showToast(msg) {
   toastTimeout = setTimeout(()=>{ t.classList.remove('show'); unlockAlpha=0; }, 2400);
 }
 
+// Power-up tutorials. Built on demand so the button names match the player's controls.
 const TUTORIALS = {
-  2: { title:'PUNCH UNLOCKED', rows:['<b>Z / X</b> — Punch nearby enemies'] },
-  3: { title:'DASH + SHOOT UNLOCKED', rows:['<b>Shift + ← →</b> — Dash through enemies','<b>Z / X</b> — Fire ranged shot'] },
-  4: { title:'WALL CLIMB UNLOCKED', rows:['Press against a wall to slow your fall','<b>Space</b> while on wall — Wall jump'] },
-  5: { title:'BURST ATTACK UNLOCKED', rows:['<b>Z / X</b> — 8-direction energy burst','Destroys all nearby enemies at once!'] },
+  2: () => ({ title:'PUNCH UNLOCKED', rows:[`<b>${ctl('attack')}</b> — Punch nearby enemies`] }),
+  3: () => ({ title:'DASH + SHOOT UNLOCKED', rows:[`<b>${ctl('dash')}</b> — Dash through enemies`,`<b>${ctl('attack')}</b> — Fire ranged shot`] }),
+  4: () => ({ title:'WALL CLIMB UNLOCKED', rows:['Press against a wall to slow your fall',`<b>${ctl('jump')}</b> while on a wall — Wall jump`] }),
+  5: () => ({ title:'BURST ATTACK UNLOCKED', rows:[`<b>${ctl('attack')}</b> — 8-direction energy burst`,'Destroys all nearby enemies at once!'] }),
 };
 // Initial tutorial for wall jump (always available)
-const WALL_JUMP_TUT = { title:'WALL JUMP', rows:['Jump into a wall to grip it','Press <b>Space</b> again to leap off','<b>Space / W</b> — Double jump midair'] };
+function wallJumpTut() {
+  return { title:'WALL JUMP', rows:['Jump into a wall to grip it',`<b>${ctl('jump')}</b> again to leap off`,`<b>${ctl('jump')}</b> in midair — Double jump`] };
+}
 
 let tutTimeout = null;
 function showTutorial(data) {
@@ -2232,11 +2814,14 @@ function stopMusic() {
     musicGain.gain.setValueAtTime(musicGain.gain.value, audioCtx.currentTime);
     musicGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
   }
+  // Hand the OLD nodes to the cleanup. (It used to clean up whatever was current 600ms later —
+  // so stopMusic(); startMusic(); on a level change deleted the NEW track and the music died.)
+  const oldNodes = musicNodes, oldGain = musicGain, oldFilter = musicFilter;
+  musicNodes = []; musicGain = null; musicFilter = null;
   setTimeout(() => {
-    musicNodes.forEach(n => { try { n.stop?.(); n.disconnect?.(); } catch(e){} });
-    musicNodes = [];
-    if (musicGain) { try { musicGain.disconnect(); } catch(e){} musicGain = null; }
-    if (musicFilter) { try { musicFilter.disconnect(); } catch(e){} musicFilter = null; }
+    oldNodes.forEach(n => { try { n.stop?.(); n.disconnect?.(); } catch(e){} });
+    if (oldGain) { try { oldGain.disconnect(); } catch(e){} }
+    if (oldFilter) { try { oldFilter.disconnect(); } catch(e){} }
   }, 600);
 }
 
@@ -2354,7 +2939,7 @@ function update() {
     powerLevel = np; applyPower();
     const msgs = ['','PUNCH UNLOCKED!','DASH + RANGED SHOTS!','WALL CLIMB UNLOCKED!','BURST ATTACK READY!'];
     showToast(msgs[powerLevel-1]||'POWER UP!');
-    if (TUTORIALS[powerLevel]) showTutorial(TUTORIALS[powerLevel]);
+    if (TUTORIALS[powerLevel]) showTutorial(TUTORIALS[powerLevel]());
   }
 
   if (invincibleTimer>0) invincibleTimer--;
@@ -2364,17 +2949,24 @@ function update() {
     p.occupied = false;
     if (p.boostCooldown > 0) p.boostCooldown--;
     if (p.type==='moving') {
-      p.y += p.vy*p.dir;
+      const dy = p.vy*p.dir;
+      p.y += dy;
+      p.lastDy = dy;
       if (p.y<H*0.18||p.y>H-80) p.dir*=-1;
     } else if (p.type==='shaky') {
       p.standTimer = Math.max(0, (p.standTimer || 0) - 0.4);
     }
   });
+  // ride moving platforms: carry anyone who was standing on one last frame
+  // (otherwise the player gets "dropped" every frame while it moves down)
+  carryOnMovingPlatform(player);
+  if (coopMode && player2) carryOnMovingPlatform(player2);
   itemBoxes.forEach(box => { if (box.bumpTimer > 0) box.bumpTimer--; });
   if (hiddenPuzzle && hiddenPuzzle.resetFlash > 0) hiddenPuzzle.resetFlash--;
 
   // ---- PLAYER INPUT ----
   const left=isLeft(), right=isRight(), up=isUp(), dash=isDash(), atk=isAtk();
+  tickTouchLatches();
   const inWaterVoid = inHiddenLevel && hiddenFromLevel === 3;
   const inLevelOneRiver = !inHiddenLevel && currentLevel === 1;
   if (inWaterVoid) {
@@ -2391,10 +2983,21 @@ function update() {
     if (player.dashTimer<=0){ player.dashing=false; player.vx=0; }
   } else {
     const moveSpeed = SPEED * charSpeedMult * (player.speedDonutTimer > 0 ? 1.45 : 1);
-    player.vx = 0;
-    if (left)  { player.vx=-moveSpeed; player.facing=-1; }
-    if (right) { player.vx= moveSpeed; player.facing= 1; }
+    if (player.wallKickTimer > 0) {
+      // keep the wall-jump push for a few frames instead of letting input erase it
+      player.wallKickTimer--;
+      player.vx *= 0.9;
+    } else {
+      // moveAxis() is -1..1 — analog for tilt/thumbstick, full for keys/buttons
+      const axis = moveAxis();
+      player.vx = axis * moveSpeed;
+      if (axis < 0) player.facing = -1;
+      if (axis > 0) player.facing = 1;
+    }
     if (dash && player.canDash && player.dashCooldown<=0 && (left||right)) {
+      if (left && !right) player.facing = -1;
+      if (right && !left) player.facing = 1;
+      player.wallKickTimer = 0;
       player.dashing=true; player.dashTimer=10;
       player.vx=player.facing*moveSpeed*2.9; player.dashCooldown=48;
       spawnParticles(player.x + PW/2, player.y + PH/2, '#a78bfa', 8);
@@ -2415,6 +3018,7 @@ function update() {
       player.vy = JUMP_V * 0.92;
       player.vx = player.wallContactDir * -SPEED * 2.5;
       player.facing = player.wallContactDir * -1;
+      player.wallKickTimer = 12;
       player.usedDouble = false;
       player.wallContact = false;
       spawnParticles(player.x + PW/2, player.y + PH/2, '#34d399', 7);
@@ -2459,6 +3063,7 @@ function update() {
   player.wallContact     = false;
   player.wallContactDir  = 0;
   player.onGround        = false;
+  player.groundPlat      = null;
 
   // platform collision
   platforms.forEach(p => {
@@ -2473,6 +3078,7 @@ function update() {
     // floor (landing on top)
     if (player.vy >= 0 && newY + PH >= p.y && player.y + PH <= p.y + p.h && newX + PW > p.x && newX < p.x + p.w) {
       newY = p.y - PH; player.vy = 0; player.onGround = true; player.usedDouble = false;
+      player.groundPlat = p; player.wallKickTimer = 0;
       p.occupied = true;
       if (p.type === 'shaky' && !p.falling) {
         p.standTimer = (p.standTimer || 0) + 1;
@@ -2486,17 +3092,19 @@ function update() {
         }
       }
     }
-    // wall climb slow (lv4+)
-    if (player.canWallClimb && player.wallContact && player.vy > 0) {
-      player.vy *= 0.35;
-    }
   });
+  // wall climb slow (lv4+) — applied once per frame, after collisions.
+  // (It used to run inside the platform loop, so it compounded ~30x and glued you to walls.)
+  if (player.canWallClimb && player.wallContact && !player.onGround && player.vy > 0) {
+    player.vy *= 0.35;
+  }
 
   player.x = newX;
   player.y = newY;
 
   // sprite animation tracking
-  if (Math.abs(player.vx) > 0.5 && player.onGround) pWalkTick += 0.32;
+  // step rate follows actual speed (slow tilt = slow steps, speed donut = fast steps)
+  if (Math.abs(player.vx) > 0.5 && player.onGround) pWalkTick += 0.32 * Math.min(1.8, Math.abs(player.vx) / SPEED);
   if (!pWasOnGround && player.onGround) pLandTimer = 7;
   if (pLandTimer > 0) pLandTimer--;
   pWasOnGround = player.onGround;
@@ -2886,8 +3494,22 @@ function updateHPBar() {
   bar.innerHTML = html;
 }
 
+function carryOnMovingPlatform(pl) {
+  const p = pl && pl.groundPlat;
+  if (!p || !pl.onGround || p.type !== 'moving' || !p.lastDy) return;
+  // only if still standing on it (guards against respawns/teleports)
+  const prevTop = p.y - p.lastDy;
+  if (Math.abs(pl.y + PH - prevTop) > 2 || pl.x + PW <= p.x || pl.x >= p.x + p.w) return;
+  pl.y += p.lastDy;
+}
+
+function hapticPulse(ms) {
+  if (isTouchDevice && navigator.vibrate) { try { navigator.vibrate(ms); } catch (_) {} }
+}
+
 function hurtPlayer() {
   if (invincibleTimer>0) return;
+  hapticPulse(40);
   player.hp--; invincibleTimer=90;
   player.vy=-5;
   playHurtSound();
@@ -3226,7 +3848,7 @@ function updatePlayer2() {
   const inWaterVoid = inHiddenLevel && hiddenFromLevel === 3;
 
   // sprite animation
-  if (Math.abs(player2.vx) > 0.5 && player2.onGround) p2WalkTick += 0.32;
+  if (Math.abs(player2.vx) > 0.5 && player2.onGround) p2WalkTick += 0.32 * Math.min(1.8, Math.abs(player2.vx) / SPEED);
   if (!p2WasOnGround && player2.onGround) p2LandTimer = 7;
   if (p2LandTimer > 0) p2LandTimer--;
   p2WasOnGround = player2.onGround;
@@ -3238,9 +3860,14 @@ function updatePlayer2() {
     if (player2.dashTimer<=0) { player2.dashing=false; player2.vx=0; }
   } else {
     const moveSpeed = SPEED * charSpeedMult * (player2.speedDonutTimer > 0 ? 1.45 : 1);
-    player2.vx=0;
-    if (left)  { player2.vx=-moveSpeed; player2.facing=-1; }
-    if (right) { player2.vx= moveSpeed; player2.facing= 1; }
+    if (player2.wallKickTimer > 0) {
+      player2.wallKickTimer--;
+      player2.vx *= 0.9;
+    } else {
+      player2.vx=0;
+      if (left)  { player2.vx=-moveSpeed; player2.facing=-1; }
+      if (right) { player2.vx= moveSpeed; player2.facing= 1; }
+    }
     if (dash && player.canDash && player2.dashCooldown<=0 && (left||right)) {
       player2.dashing=true; player2.dashTimer=10;
       player2.vx=player2.facing*moveSpeed*2.9; player2.dashCooldown=48;
@@ -3256,7 +3883,7 @@ function updatePlayer2() {
       player2.vy=JUMP_V; player2.onGround=false; player2.usedDouble=false; playJumpSound();
     } else if (player2.wallContact) {
       player2.vy=JUMP_V*0.92; player2.vx=player2.wallContactDir*-SPEED*2.5;
-      player2.facing=player2.wallContactDir*-1; player2.usedDouble=false; player2.wallContact=false; playJumpSound();
+      player2.facing=player2.wallContactDir*-1; player2.wallKickTimer=12; player2.usedDouble=false; player2.wallContact=false; playJumpSound();
     } else if (!player2.usedDouble) {
       player2.vy=JUMP_V*0.82; player2.usedDouble=true; playDoubleJumpSound();
     }
@@ -3287,7 +3914,7 @@ function updatePlayer2() {
   if (inWaterVoid) player2.vx *= 0.95;
   let nx=player2.x+player2.vx, ny=player2.y+player2.vy;
   ny = tryHitItemBox(player2, nx, ny);
-  player2.wallContact=false; player2.wallContactDir=0; player2.onGround=false;
+  player2.wallContact=false; player2.wallContactDir=0; player2.onGround=false; player2.groundPlat=null;
 
   platforms.forEach(p => {
     if (player2.vx>=0 && nx+PW>p.x && player2.x+PW<=p.x+3 && ny+PH>p.y+2 && ny<p.y+p.h-2)
@@ -3295,7 +3922,7 @@ function updatePlayer2() {
     else if (player2.vx<=0 && nx<p.x+p.w && player2.x>=p.x+p.w-3 && ny+PH>p.y+2 && ny<p.y+p.h-2)
       { nx=p.x+p.w; player2.vx=0; player2.wallContact=true; player2.wallContactDir=-1; }
     if (player2.vy>=0 && ny+PH>=p.y && player2.y+PH<=p.y+p.h && nx+PW>p.x && nx<p.x+p.w)
-      { ny=p.y-PH; player2.vy=0; player2.onGround=true; player2.usedDouble=false; p.occupied = true;
+      { ny=p.y-PH; player2.vy=0; player2.onGround=true; player2.usedDouble=false; player2.groundPlat=p; player2.wallKickTimer=0; p.occupied = true;
         if (p.type === 'shaky' && !p.falling) {
           p.standTimer = (p.standTimer || 0) + 1;
           if (p.boostArmed !== false && (p.boostCooldown || 0) <= 0) {
@@ -3307,8 +3934,9 @@ function updatePlayer2() {
           }
         }
       }
-    if (player.canWallClimb && player2.wallContact && player2.vy>0) player2.vy*=0.35;
   });
+  // P2 shares P1's unlocked powers, so it checks player.canWallClimb on purpose
+  if (player.canWallClimb && player2.wallContact && !player2.onGround && player2.vy>0) player2.vy*=0.35;
 
   player2.x=nx; player2.y=ny;
 
@@ -4169,7 +4797,8 @@ function drawFruits() {
 }
 
 function drawPlayer() {
-  if (invincibleTimer>0 && Math.floor(invincibleTimer/4)%2===0) return;
+  // after a hit: flicker semi-transparent instead of vanishing, so you never lose track of yourself
+  const baseA = (invincibleTimer>0 && Math.floor(invincibleTimer/4)%2===0) ? 0.3 : 1;
   const px=player.x-scrollX;
   const py=player.y;
   const bodyColors=getCurrentCharacterColors();
@@ -4190,26 +4819,30 @@ function drawPlayer() {
   }
 
   ctx.save();
-  ctx.translate(px+PW/2, py+PH/2);
+  // squash/stretch is anchored at the feet so landing squashes DOWN into the ground
+  // (it used to scale around the middle, which lifted the feet off the floor)
+  ctx.translate(px+PW/2, py+PH);
   if (sinkRot) ctx.rotate(sinkRot);
   ctx.scale(player.facing * scX, scY);
+  ctx.translate(0, -PH/2);
+  ctx.globalAlpha = baseA;
 
   // dash trail
   if (player.dashing) {
-    ctx.globalAlpha=0.25;
+    ctx.globalAlpha=0.25*baseA;
     for (let t=1;t<=3;t++) {
       ctx.fillStyle=bodyCol;
       ctx.beginPath(); ctx.roundRect(-PW/2-t*8, -PH/2, PW, PH, 4); ctx.fill();
     }
-    ctx.globalAlpha=1;
+    ctx.globalAlpha=baseA;
   }
 
   // body glow aura at high power
   if (powerLevel>=4) {
-    ctx.shadowBlur=18; ctx.shadowColor=bodyCol; ctx.globalAlpha=0.7;
+    ctx.shadowBlur=18; ctx.shadowColor=bodyCol; ctx.globalAlpha=0.7*baseA;
     ctx.fillStyle=bodyCol;
     ctx.beginPath(); ctx.roundRect(-PW/2-2,-PH/2-2,PW+4,PH+4,6); ctx.fill();
-    ctx.shadowBlur=0; ctx.globalAlpha=1;
+    ctx.shadowBlur=0; ctx.globalAlpha=baseA;
   }
 
   ctx.fillStyle=bodyCol;
@@ -4242,10 +4875,15 @@ function drawPlayer() {
       ctx.beginPath(); ctx.roundRect(-PW/2+1, PH/2-2+swing, 7, 5, 2); ctx.fill();
       ctx.beginPath(); ctx.roundRect(PW/2-8, PH/2-2-swing, 7, 5, 2); ctx.fill();
     }
+  } else {
+    // dashing: feet tucked back instead of disappearing
+    ctx.fillStyle = bodyCol;
+    ctx.beginPath(); ctx.roundRect(-PW/2-3, PH/2-4, 8, 4, 2); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(-PW/2+4, PH/2-3, 8, 4, 2); ctx.fill();
   }
 
-  // face
-  const isIdle = !waterDeathPending && player.onGround && player.vx === 0 && !player.dashing && !player.attackTimer;
+  // face (same idle rule as update(), so face and idle timers always agree)
+  const isIdle = !waterDeathPending && player.onGround && Math.abs(player.vx) < 0.05 && !player.dashing && !player.attackTimer;
   if (isIdle) {
     const bob = Math.sin(frameCount * 0.06) * 1.5;
     ctx.save(); ctx.translate(0, Math.round(bob));
@@ -4439,7 +5077,7 @@ function drawWakeIntroCutscene() {
   ctx.textAlign = 'center';
   ctx.fillText('WAKING UP...', W / 2, H - 20);
   ctx.font = '10px monospace';
-  ctx.fillText('PRESS SPACE, ENTER, Z, X OR TAP TO SKIP', W / 2, H - 8);
+  ctx.fillText(isTouchDevice ? 'TAP TO SKIP' : 'PRESS SPACE, ENTER, Z, X OR TAP TO SKIP', W / 2, H - 8);
   ctx.textAlign = 'left';
 }
 
@@ -4539,7 +5177,7 @@ function drawPlayer2() {
     ctx.restore();
     return;
   }
-  if (p2InvincTimer > 0 && Math.floor(p2InvincTimer/4)%2===0) return;
+  const baseA2 = (p2InvincTimer > 0 && Math.floor(p2InvincTimer/4)%2===0) ? 0.3 : 1;
 
   const px = player2.x - scrollX;
   const py = player2.y;
@@ -4556,21 +5194,23 @@ function drawPlayer2() {
   const bodyCol = bodyColors[Math.min(powerLevel-1,4)];
 
   ctx.save();
-  ctx.translate(px+PW/2, py+PH/2);
+  ctx.translate(px+PW/2, py+PH);          // anchor squash at the feet
   ctx.scale(player2.facing * scX, scY);
+  ctx.translate(0, -PH/2);
+  ctx.globalAlpha = baseA2;
 
   // Dash trail
   if (player2.dashing) {
-    ctx.globalAlpha=0.22;
+    ctx.globalAlpha=0.22*baseA2;
     for(let t=1;t<=3;t++) { ctx.fillStyle=bodyCol; ctx.beginPath(); ctx.roundRect(-PW/2-t*8,-PH/2,PW,PH,4); ctx.fill(); }
-    ctx.globalAlpha=1;
+    ctx.globalAlpha=baseA2;
   }
 
   // Aura at high power
   if (powerLevel>=4) {
-    ctx.shadowBlur=14; ctx.shadowColor=bodyCol; ctx.globalAlpha=0.65;
+    ctx.shadowBlur=14; ctx.shadowColor=bodyCol; ctx.globalAlpha=0.65*baseA2;
     ctx.fillStyle=bodyCol; ctx.beginPath(); ctx.roundRect(-PW/2-2,-PH/2-2,PW+4,PH+4,6); ctx.fill();
-    ctx.shadowBlur=0; ctx.globalAlpha=1;
+    ctx.shadowBlur=0; ctx.globalAlpha=baseA2;
   }
 
   ctx.fillStyle = bodyCol;
@@ -4917,12 +5557,32 @@ wrapper.addEventListener('contextmenu', e => {
 // ─────────────────────────────────────────────
 //  LOOP
 // ─────────────────────────────────────────────
-function loop() {
-  update();
+// The game logic is written "per frame" (speeds, timers, gravity all assume
+// 60 updates per second). Screens refresh at 60, 90, 120 or 144 Hz, so we run
+// update() on a fixed 60 Hz clock and just draw as often as the screen wants.
+// Without this the whole game runs 2x fast on 120 Hz phones/iPads.
+const STEP_MS = 1000 / 60;
+let lastFrameTime = performance.now();
+let stepAccumulator = 0;
+let lastUiState = null;
+function loop(now = performance.now()) {
+  let dt = now - lastFrameTime;
+  lastFrameTime = now;
+  if (dt > 250) dt = 250;                          // tab was asleep — don't fast-forward
+  if (Math.abs(dt - STEP_MS) < 1.5) dt = STEP_MS;  // absorb jitter on 60 Hz screens
+  stepAccumulator += dt;
+  let steps = 0;
+  while (stepAccumulator >= STEP_MS && steps < 5) {
+    update();
+    stepAccumulator -= STEP_MS;
+    steps++;
+  }
+  if (steps === 5) stepAccumulator = 0;           // very slow device: drop the backlog
   draw();
+  if (state !== lastUiState) { document.body.classList.toggle('playing', state === 'play'); lastUiState = state; }
   requestAnimationFrame(loop);
 }
-loop();
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
