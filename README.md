@@ -60,6 +60,12 @@ Pick a control style on the start screen (or any time from **MENU → CONTROLS**
 - **Kill enemies** — defeat them for big score bonuses
 - **Clear levels** — level-complete bonuses stack with your run
 
+## Hearts, falling & checkpoints
+
+- Getting hit costs a heart. Hearts refill with health packs.
+- **Falling off the map or into the river costs one heart** and puts you back on the last solid ground you stood on.
+- Out of hearts? You restart at your last **checkpoint** with full hearts. With no checkpoint yet, it's game over.
+
 ## Power Progression
 
 | Level | Score | Unlocks |

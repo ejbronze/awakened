@@ -270,6 +270,7 @@
       font-size: 11px; color: rgba(255,255,255,0.4);
       letter-spacing: 3px; margin-bottom: 24px;
     }
+    .new-best.hidden { display: none; }
     .new-best {
       font-size: 12px; color: #4ade80;
       letter-spacing: 3px; margin-bottom: 8px;
@@ -1088,6 +1089,7 @@ function resetPlayer() {
 //  WORLD
 // ─────────────────────────────────────────────
 let platforms=[], enemies=[], projectiles=[], particles=[], fruits=[], healthPacks=[], heartPopups=[], itemBoxes=[];
+let lastSafeGround = null;   // last solid platform the player stood on (fall respawn)
 const FRUIT_TYPES = ['apple','banana','strawberry','orange'];
 const SPECIAL_FRUIT_TYPES = ['donut','speed_donut'];
 let platformEnd = 0;
@@ -1338,6 +1340,7 @@ function seedItemBoxes() {
 
 function initWorld() {
   platforms=[]; enemies=[]; projectiles=[]; particles=[]; fruits=[]; healthPacks=[]; heartPopups=[]; itemBoxes=[];
+  lastSafeGround = null;
   scrollX=0; platformEnd=0; frameCount=0; invincibleTimer=0;
   unlockAlpha=0; levelDoor=null; hiddenTrigger=null; hiddenPuzzle=null; levelTransition=0;
   waterDeathTimer = 0; waterDeathPending = false; waveChaseX = -9999;
@@ -1474,13 +1477,15 @@ function stripFlightAndPower(target='p1', cause='enemy') {
 }
 
 function findRespawnPlatformAt(x) {
-  let best = null;
+  // prefer solid ground: respawning onto a moving / sinking / jump-pad platform is unfair
+  let best = null, bestAny = null;
   platforms.forEach(p => {
     if (x >= p.x - 20 && x <= p.x + p.w + 20) {
-      if (!best || p.y < best.y) best = p;
+      if (!bestAny || p.y < bestAny.y) bestAny = p;
+      if (p.type === 'solid' && (!best || p.y < best.y)) best = p;
     }
   });
-  return best;
+  return best || bestAny;
 }
 
 function makeCheckpointAt(x) {
@@ -2517,6 +2522,7 @@ function showDeathFinal() {
   const ctaEl = document.querySelector('#deathScreen .cta');
   if (titleEl) titleEl.textContent = 'YOU LOST';
   if (ctaEl) ctaEl.textContent = ctaText('TRY AGAIN');
+  document.getElementById('newBestUI').textContent = 'NEW BEST!';
   const isNew = score > 0 && leaderboard.length > 0 && leaderboard[0].score === score;
   document.getElementById('deathScoreUI').textContent = score;
   document.getElementById('newBestUI').classList.toggle('hidden', !isNew);
@@ -2944,7 +2950,8 @@ function update() {
     if (waterDeathTimer % 8 === 0) spawnParticles(player.x + PW/2, player.y + PH/2, 'rgba(147,197,253,0.8)', 3);
     if (waterDeathTimer <= 0) {
       waterDeathPending = false;
-      if (!tryRespawnPlayer()) showDeath();
+      if (inHiddenLevel) { if (!tryRespawnPlayer()) showDeath(); }
+      else respawnAfterFall();
     }
     updateHPBar();
     return;
@@ -3195,6 +3202,7 @@ function update() {
 
   player.x = newX;
   player.y = newY;
+  rememberSafeGround();
 
   // sprite animation tracking
   // step rate follows actual speed (slow tilt = slow steps, speed donut = fast steps)
@@ -3254,7 +3262,16 @@ function update() {
         }
       }
     } else {
+      // ride moving platforms like the player does (they used to bounce and drop through)
+      const sp = e.supportPlatform;
+      if (e.onGround && sp && sp.type === 'moving' && sp.lastDy && e.x + e.w > sp.x && e.x < sp.x + sp.w) e.y += sp.lastDy;
+      // far off-screen: wait in place until the player gets close (they used to get pinned
+      // between "turn back at the screen edge" and "turn back at the platform edge")
+      const sxe = e.x - scrollX;
+      if (e.onGround && (sxe < -120 || sxe > W + 120)) return;
       e.vy += GRAVITY; e.x += e.vx; e.y += e.vy; e.onGround=false;
+      if (e.animSeed === undefined) e.animSeed = Math.random() * 6.28;
+      e.walkPhase = (e.walkPhase || e.animSeed) + 0.28 * Math.min(2, Math.max(0.6, Math.abs(e.vx)));
     }
     platforms.forEach(p => {
       if (e.type === 'flower') return;
@@ -3265,7 +3282,7 @@ function update() {
     });
     if (e.type !== 'flower' && e.onGround) {
       const ex=e.x-scrollX;
-      if (ex<-20||ex>W+20) e.vx*=-1;
+      if ((ex < -20 && e.vx < 0) || (ex > W + 20 && e.vx > 0)) e.vx *= -1;
       const aheadX = e.vx >= 0 ? e.x + e.w + 6 : e.x - 6;
       const support = findSupportPlatformAt(aheadX, e.y + e.h + 2, 16);
       if (!support) {
@@ -3567,7 +3584,34 @@ function update() {
     startWaterDeath();
     return;
   }
-  if (player.y > H + 100 && !tryRespawnPlayer()) showDeath();
+  if (player.y > H + 100) respawnAfterFall();
+}
+
+// Falling off the map (or into the Level 1 river) costs ONE heart and puts you back on the
+// last solid ground you stood on. (Before: no checkpoint yet = instant game over even at full
+// health; with a checkpoint = sent back with full health, so falling was a free heal.)
+function rememberSafeGround() {
+  const p = player.groundPlat;
+  if (player.onGround && p && p.type === 'solid' && !inHiddenLevel) lastSafeGround = { plat: p, x: player.x };
+}
+function respawnAfterFall() {
+  player.hp -= 1;
+  heartPopups.push({ idx: Math.max(0, player.hp), x: player.x + PW/2, y: H - 40, vy: -3, life: 40, maxLife: 40 });
+  playHurtSound(); hapticPulse(40);
+  updateHPBar();
+  if (player.hp <= 0) { if (!tryRespawnPlayer()) showDeath(); return; }
+  const safe = lastSafeGround && platforms.includes(lastSafeGround.plat) ? lastSafeGround : null;
+  const plat = safe ? safe.plat : (activeCheckpoint && findRespawnPlatformAt(activeCheckpoint.x));
+  if (!plat) { if (!tryRespawnPlayer()) showDeath(); return; }
+  const x = safe ? safe.x : activeCheckpoint.x - 10;
+  player.x = Math.max(plat.x + 4, Math.min(x, plat.x + plat.w - PW - 4));
+  player.y = plat.y - PH;
+  player.vx = 0; player.vy = 0; player.onGround = true;
+  player.flyTimer = 0;
+  invincibleTimer = 100;
+  scrollX = Math.max(0, player.x - W * 0.35);
+  spawnParticles(player.x + PW/2, player.y + PH/2, '#fde68a', 14);
+  showToast('OOPS! −1 ♥');
 }
 
 let prevHp = 6;
@@ -4808,8 +4852,10 @@ function drawEnemies(b) {
       return;
     }
     const ratio = e.hp / e.maxHp;
-    const squish = Math.abs(Math.sin(frameCount * 0.18 + e.x)) * 1.5;
-    const walkSwing = e.onGround && Math.abs(e.vx) > 0.2 ? Math.sin(frameCount * 0.28 + e.x) * 3.5 : 0;
+    // animation clocks belong to the enemy (they used to include e.x, so walking made the
+    // legs flail 4-10x too fast and at different speeds left vs right)
+    const squish = Math.abs(Math.sin(frameCount * 0.18 + (e.animSeed || 0))) * 1.5;
+    const walkSwing = e.onGround && Math.abs(e.vx) > 0.2 ? Math.sin(e.walkPhase || 0) * 3.5 : 0;
     ctx.save();
     ctx.translate(ex + e.w/2, e.y + e.h/2);
 
