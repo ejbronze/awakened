@@ -3037,10 +3037,14 @@ function update() {
     p.occupied = false;
     if (p.boostCooldown > 0) p.boostCooldown--;
     if (p.type==='moving') {
-      const dy = p.vy*p.dir;
-      p.y += dy;
-      p.lastDy = dy;
-      if (p.y<H*0.18||p.y>H-80) p.dir*=-1;
+      // Bounce between a top and bottom limit. (Before: platforms that spawned below
+      // the bottom limit flipped direction EVERY frame and vibrated in place forever.)
+      const top = H * 0.18, bottom = H - 80;
+      const oldY = p.y;
+      p.y += p.vy * p.dir;
+      if (p.y < top)    { p.y = top;    if (p.vy * p.dir < 0) p.dir *= -1; }
+      if (p.y > bottom) { p.y = bottom; if (p.vy * p.dir > 0) p.dir *= -1; }
+      p.lastDy = p.y - oldY;
     } else if (p.type==='shaky') {
       p.standTimer = Math.max(0, (p.standTimer || 0) - 0.4);
     }
@@ -4486,7 +4490,7 @@ function drawPlatforms(b) {
     const px=p.x-scrollX;
     if (px+p.w<-10||px>W+10) return;
     const shakeX = p.type === 'shaky' && !p.falling ? Math.sin(frameCount * 0.4 + (p.shakePhase || 0)) * Math.min(3, (p.standTimer || 0) / 45) : 0;
-    const py = p.y + (p.type === 'shaky' && p.falling ? Math.sin(frameCount * 0.7 + px) * 1.5 : 0);
+    const py = p.y + (p.type === 'shaky' && p.falling ? Math.sin(frameCount * 0.7 + p.x) * 1.5 : 0);
     const x = px + shakeX;
     // body
     ctx.fillStyle = p.type === 'sinking' ? '#7c3aed' : b.ground;
