@@ -37,22 +37,20 @@ The first time you start a run, a short **How To Play** walkthrough appears (4 q
 
 ## Controls — phones & tablets
 
-Play with the phone **sideways** (landscape). If you hold it upright, the game pauses and asks you to turn it.
+Play with the phone **sideways** (landscape). If you hold it upright, the game pauses and asks you to turn it. The game always fills the whole screen — on wide phones you simply see more of the level.
 
 Pick a control style on the start screen (or any time from **MENU → CONTROLS**). Your choice is remembered.
 
-| Style | Move | Jump | Attack | Dash |
-|-------|------|------|--------|------|
-| 📱 **TILT** *(default)* | Tilt the phone left / right — a little to walk, more to sprint | Tap / hold the **right half** of the screen | Tap the **left half** | Swipe ← or → on the **left half** |
-| 🕹 **STICK** | Drag anywhere on the **left half** — a thumbstick appears under your thumb | Tap / hold the **right half** | **ATK** button | **DSH** button, or flick the stick quickly |
-| ⬚ **BUTTONS** | ◀ ▶ buttons (you can slide your thumb between them) | **JMP** button | **ATK** button | **DSH** + ◀ / ▶ |
+| Style | Move | Jump | Dash | Attack |
+|-------|------|------|------|--------|
+| 👆 **TAP** *(default)* | **Hold** the left half = run left, **hold** the right half = run right | **Double-tap** (or swipe up). Double-tap again in midair = double jump | Swipe ← or → | **ATK** button |
+| 📱 **TILT** | Tilt the phone — a little to walk, more to sprint | **Tap** anywhere | Swipe ← or → | **ATK** button |
+| ⬚ **BUTTONS** | ◀ ▶ buttons (slide your thumb between them) | **JMP** | **DSH** + ◀ / ▶ | **ATK** |
 
-Tilt tips:
-
-- **However you're holding the phone when the run starts counts as "standing still"** — sitting, lying down, whatever is comfortable.
-- Tilt drifting? **MENU → RE-CENTER TILT**. Moving the wrong way? **MENU → TILT: INVERTED**.
-- On iPhone / iPad, Safari asks for permission to use motion the first time — tap **Allow**. If you say no (or the device has no motion sensor), the game switches to STICK automatically.
-- For true fullscreen on iPhone, use Safari's **Share → Add to Home Screen** and launch it from there. On Android the game goes fullscreen when you tap to begin.
+- The **ATK** and **DSH** buttons only appear once you've unlocked those powers, so the screen stays clean at the start.
+- TAP tip: on the second tap of a double-tap, keep your finger down — you'll jump *and* keep running that way.
+- TILT tips: however you're holding the phone when the run starts counts as "standing still". **MENU → RE-CENTER** if it drifts, **TILT: INVERTED** if it goes the wrong way. iPhone asks permission to use motion the first time — tap **Allow** (if you don't, the game switches to TAP).
+- For true fullscreen on iPhone, use Safari's **Share → Add to Home Screen** and open it from there. On Android it goes fullscreen when you tap to begin. On a computer, use the ⛶ button.
 
 ## How to Score
 
@@ -98,7 +96,9 @@ Hidden void stages can branch off from the main path. These secret levels are ti
 - **Character select with preview** — choose a hero before the run, with live preview art and appearance styles
 - **Distinct hero looks** — same core body shape, but each character has their own visual identity
 - **Accessible in-run menu** — persistent menu button, pause hub, restart flow, and character bay
-- **Phone controls built for touch** — tilt to move, or a floating thumbstick, or classic buttons; analog speed; haptic buzz when you get hit
+- **Phone controls built for touch** — hold-to-run + double-tap jump, tilt, or classic buttons; haptic buzz when you get hit
+- **Fills any screen** — the world widens to match your screen shape (no black bars), and everything is drawn at full resolution
+- **Menus that always fit** — start, pause and game-over screens scale with the game; no scrolling
 - **How To Play walkthrough** — skippable first-run guide that matches your control style, replayable from the menus
 - **Same speed on every screen** — the game runs at a fixed 60 updates/sec, so 120 Hz phones and iPads don't play double-speed
 - **Local co-op** — second player joins with shared score and power progression
@@ -175,14 +175,16 @@ Your game will be live at `https://awakened-[hash].vercel.app`.
 - [x] Persistent donut flight with power-down hazards
 - [x] Stationary flower enemies with fireball attacks
 - [x] Stronger per-level world themes and clearer shuttle-style exits
-- [x] Tilt / thumbstick phone controls, landscape prompt, first-run walkthrough
+- [x] Tap / tilt / button phone controls, landscape prompt, first-run walkthrough
+- [x] Full-screen, full-resolution rendering with smooth motion on 120 Hz screens
 - [x] Fixed-timestep game loop (consistent speed on 60/120/144 Hz screens)
 
 ---
 
 ## Notes for developers
 
-- **Game speed:** everything in `update()` is written "per frame" at 60 fps. The loop at the bottom of `index.html` runs `update()` on a fixed 60 Hz clock and draws as often as the screen refreshes — keep new speeds/timers in per-frame units and they'll stay consistent.
+- **Game speed:** everything in `update()` is written "per frame" at 60 fps. The loop at the bottom of `index.html` runs `update()` on a fixed 60 Hz clock and draws as often as the screen refreshes (blending positions in between on fast screens) — keep new speeds/timers in per-frame units and they'll stay consistent.
+- **Screen size:** the world is always `H = 420` units tall; `W` changes with the screen shape (560–924). Always use `W`/`H` (never hard-code 700) when drawing across the screen. Menus/HUD live in `#ui`, laid out at 420px tall and scaled by `fitGame()` — design them to fit 420 tall and they'll never need scrolling.
 - **Input:** read movement with `moveAxis()` (−1…1, analog on tilt/stick) and buttons with `isUp()` / `isAtk()` / `isDash()`. They already merge keyboard, on-screen buttons, tilt and touch zones.
 - **Control labels:** use `ctl('jump')`, `ctl('attack')`, etc. in any tutorial text so it says the right thing for keyboard vs. phone.
 - **Testing tilt on a laptop:** Chrome DevTools → ⋮ → More tools → **Sensors** lets you fake device orientation; use device mode (phone emulation) so the touch controls turn on.
