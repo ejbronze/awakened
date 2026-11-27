@@ -638,6 +638,128 @@
     .menu-note {
       margin-top:8px; text-align:center; color:rgba(255,255,255,0.42); font-size:10px; letter-spacing:1px;
     }
+
+    /* HUD stays out of the way on menus (it used to ghost through the start screen) */
+    body.at-menu #hud, body.at-menu #bossBar { display: none; }
+
+    /* Coins */
+    i.coin {
+      display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: -1px;
+      background: radial-gradient(circle at 35% 30%, #fff7c2 0 18%, #fbbf24 22% 62%, #b45309 66%);
+      box-shadow: 0 0 4px rgba(251,191,36,0.6);
+    }
+    #hud .coin-stat { margin-left: 10px; color: #fde68a; }
+    #hud .coin-stat.bump i.coin { animation: coinBump 0.25s ease; }
+    @keyframes coinBump { 50% { transform: scale(1.6); } }
+    .coin-pill {
+      display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+      background: rgba(251,191,36,0.12); border: 1px solid rgba(251,191,36,0.4); color: #fde68a;
+      font-size: 13px; letter-spacing: 1px;
+    }
+
+    /* Player chip on the start screen */
+    .player-chip {
+      position: absolute; top: 8px; left: 8px; z-index: 2;
+      display: flex; align-items: center; gap: 6px;
+      font-family: 'Share Tech Mono', monospace; font-size: 11px; letter-spacing: 1px;
+      background: rgba(0,0,0,0.55); color: rgba(255,255,255,0.75);
+      border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 5px 12px 5px 6px; cursor: pointer;
+    }
+    .player-chip canvas { width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.08); }
+    .player-chip b { color: #fff; font-weight: normal; }
+    .player-chip .swap { color: rgba(255,255,255,0.4); }
+    .player-chip:hover { border-color: rgba(255,255,255,0.45); }
+    .start-links { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+    .start-links .howto-link { margin-top: 0; }
+    .howto-link.shop { color: #fde68a; border-color: rgba(251,191,36,0.45); }
+    .howto-link.confirm { color: #fca5a5; border-color: #ef4444; }
+    .style-dot.add { background: none; color: rgba(255,255,255,0.6); font: 14px/16px monospace; text-align: center; border-style: dashed; }
+
+    /* Who's playing? */
+    #profileScreen { z-index: 14; background: rgba(5,5,12,0.94); justify-content: center; gap: 4px; }
+    #profileScreen .screen-title { font-size: 46px; letter-spacing: 7px; line-height: 1; }
+    .profile-sub { font-size: 10px; letter-spacing: 3px; color: rgba(255,255,255,0.45); margin-bottom: 14px; }
+    .profile-list { display: flex; gap: 12px; justify-content: center; flex-wrap: nowrap; }
+    .profile-card {
+      position: relative; width: 124px; padding: 10px 6px 9px; border-radius: 14px; cursor: pointer;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.14);
+      color: #fff; font-family: 'Share Tech Mono', monospace; text-align: center;
+      transition: transform 0.12s, border-color 0.12s;
+    }
+    .profile-card:hover, .profile-card:focus-visible { transform: translateY(-3px); border-color: var(--gold); outline: none; }
+    .profile-card canvas { width: 72px; height: 72px; display: block; margin: 0 auto 6px; border-radius: 12px; background: rgba(255,255,255,0.05); }
+    .profile-card .pc-name { font: 18px/1 'Bebas Neue', sans-serif; letter-spacing: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .profile-card .pc-meta { margin-top: 4px; font-size: 10px; color: rgba(255,255,255,0.55); letter-spacing: 1px; }
+    .profile-card .pc-meta i.coin { width: 8px; height: 8px; }
+    .profile-card.add { border-style: dashed; color: rgba(255,255,255,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .profile-card.add .plus { font-size: 34px; line-height: 72px; height: 78px; color: rgba(255,255,255,0.5); }
+    .profile-card .pc-del {
+      display: none; position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%;
+      background: #ef4444; color: #fff; border: 2px solid #0a0a0f; font: 12px/20px monospace; cursor: pointer;
+    }
+    #profileScreen.managing .profile-card .pc-del { display: block; }
+    #profileScreen.managing .profile-card:not(.add) { animation: wiggle 0.5s ease-in-out infinite; }
+    .profile-card.confirm-del { border-color: #ef4444; animation: none !important; }
+    .profile-card.confirm-del .pc-meta { color: #fca5a5; }
+    @keyframes wiggle { 0%,100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.2deg); } }
+    .profile-new { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    .profile-new.hidden, .profile-list.hidden { display: none; }
+    #profileNameInput {
+      font-family: 'Share Tech Mono', monospace; font-size: 20px; letter-spacing: 4px; text-transform: uppercase;
+      background: rgba(255,255,255,0.08); border: 2px solid var(--gold); color: #fff; text-align: center;
+      padding: 8px 14px; border-radius: 6px; width: 260px; outline: none;
+    }
+    #profileNameInput::placeholder { color: rgba(255,255,255,0.25); }
+    .profile-new .howto-actions { margin-top: 2px; }
+    .profile-foot { margin-top: 12px; min-height: 30px; }
+
+    /* Shop */
+    #shopScreen { z-index: 16; background: rgba(5,5,12,0.95); justify-content: flex-start; padding: 12px 18px 12px; gap: 8px; }
+    .shop-head { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+    .shop-head .howto-link { margin: 0; }
+    .shop-title { font: 36px/1 'Bebas Neue', sans-serif; letter-spacing: 8px; color: #fff; }
+    .shop-tabs { display: flex; gap: 6px; }
+    .shop-tab {
+      font-family: 'Share Tech Mono', monospace; font-size: 12px; letter-spacing: 2px; cursor: pointer;
+      background: transparent; color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 999px; padding: 5px 16px;
+    }
+    .shop-tab.active { background: var(--gold); color: #0a0a0f; border-color: var(--gold); }
+    .shop-grid { width: 100%; flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(6, 1fr); grid-auto-rows: 1fr; gap: 8px; }
+    .shop-grid.powers { grid-template-columns: repeat(3, 1fr); }
+    .shop-item {
+      position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px;
+      color: #fff; font-family: 'Share Tech Mono', monospace; cursor: pointer; padding: 6px 4px; min-width: 0;
+    }
+    .shop-item:hover { border-color: rgba(255,255,255,0.35); }
+    .shop-item.selected { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 18px rgba(255,215,0,0.18); }
+    .shop-item canvas { width: 56px; height: 56px; }
+    .shop-item .si-icon { font-size: 26px; line-height: 1; }
+    .shop-item .si-name { font-size: 10px; letter-spacing: 1px; color: rgba(255,255,255,0.85); text-align: center; }
+    .shop-item .si-desc { font-size: 9px; color: rgba(255,255,255,0.5); text-align: center; line-height: 1.3; padding: 0 4px; }
+    .shop-item .si-price { font-size: 11px; color: #fde68a; display: flex; align-items: center; gap: 4px; }
+    .shop-item .si-price.owned { color: #86efac; }
+    .shop-item .si-price.equipped { color: #0a0a0f; background: #86efac; padding: 1px 6px; border-radius: 999px; font-size: 9px; }
+    .shop-item.locked:not(.affordable) .si-price { color: rgba(255,255,255,0.35); }
+    .shop-item .si-pips { display: flex; gap: 3px; }
+    .shop-item .si-pips b { width: 10px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.15); }
+    .shop-item .si-pips b.on { background: #86efac; }
+    .shop-detail {
+      width: 100%; display: flex; align-items: center; gap: 12px; min-height: 46px;
+      background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 6px 8px 6px 14px;
+    }
+    .sd-text { flex: 1; min-width: 0; text-align: left; }
+    .sd-name { font: 20px/1 'Bebas Neue', sans-serif; letter-spacing: 2px; color: #fff; }
+    .sd-desc { font-size: 10px; color: rgba(255,255,255,0.6); letter-spacing: 1px; margin-top: 2px; }
+    .sd-btn { min-width: 132px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .sd-btn:disabled { visibility: visible; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.4); cursor: default; }
+    .sd-btn.done, .sd-btn.done:disabled { background: #86efac; color: #0a0a0f; }
+
+    /* Game over: coins this run + quick actions */
+    .death-coins { margin: 2px 0 2px; color: #fde68a; font-size: 13px; letter-spacing: 2px; display: flex; gap: 6px; align-items: center; justify-content: center; }
+    .death-actions { display: flex; gap: 6px; justify-content: center; margin: 8px 0 6px; }
+    .death-actions .howto-link { margin: 0; }
   </style>
 </head>
 <body>
@@ -661,8 +783,8 @@
   <!-- HUD -->
   <div id="hud">
     <div class="left">
-      <div class="stat">SCORE <span id="scoreUI">0</span></div>
-      <div class="stat">POWER <span id="lvlUI">1</span> &nbsp; LVL <span id="levelUI">1</span></div>
+      <div class="stat">SCORE <span id="scoreUI">0</span><span class="coin-stat" id="coinStat"><i class="coin"></i> <span id="coinUI">0</span></span></div>
+      <div class="stat">LVL <span id="levelUI">1</span> &nbsp; POWER <span id="lvlUI">1</span></div>
       <div id="missionBox">
         <div id="missionTitle">OBJECTIVES</div>
         <div id="missionList"></div>
@@ -672,7 +794,7 @@
       <div class="stat" id="biomeUI">SUNNY FIELDS</div>
       <div class="stat" id="hiddenTimerStat" style="display:none;">VOID <span id="hiddenTimerUI">0</span></div>
       <div class="stat" style="display:flex;gap:4px;align-items:center;">HP <span id="hpUI" style="display:flex;gap:2px;margin-left:4px;"></span></div>
-      <div class="stat" id="p2Stat" style="display:flex;gap:4px;align-items:center;">P2 <span id="p2HpUI" style="display:flex;gap:2px;margin-left:4px;"></span></div>
+      <div class="stat" id="p2Stat" style="gap:4px;align-items:center;">P2 <span id="p2HpUI" style="display:flex;gap:2px;margin-left:4px;"></span></div>
     </div>
   </div>
 
@@ -693,6 +815,7 @@
 
   <!-- Start Screen (two columns so it always fits — no scrolling) -->
   <div class="screen" id="startScreen">
+    <button class="player-chip" id="playerChip" data-ui title="Switch player"><canvas id="chipAvatar" width="96" height="96"></canvas><b id="chipName">PLAYER</b><i class="coin"></i><span id="chipCoins">0</span><span class="swap">⇄</span></button>
     <div class="start-layout">
       <div class="start-left">
         <div class="screen-title">AWAKENED</div>
@@ -708,8 +831,12 @@
         </div>
         </div>
         <div class="start-actions">
-          <div class="cta">PRESS SPACE TO BEGIN</div>
-          <button class="howto-link" id="startHowToBtn" data-ui>? HOW TO PLAY</button>
+          <div class="cta" id="startCta">PRESS SPACE TO BEGIN</div>
+          <div class="start-links">
+            <button class="howto-link" id="newGameBtn" data-ui>↻ NEW GAME</button>
+            <button class="howto-link shop" id="startShopBtn" data-ui>🛒 SHOP</button>
+            <button class="howto-link" id="startHowToBtn" data-ui>? HOW TO PLAY</button>
+          </div>
         </div>
         <div class="highscore-line" id="startHiScore"></div>
       </div>
@@ -725,18 +852,11 @@
               <div class="char-name" id="charNameUI">THE NOBODY</div>
               <div class="char-desc" id="charDescUI">A blank slate. Master of nothing — yet.</div>
               <div class="char-stats" id="charStatsUI">HP 6 • SPD 1.00x • START POWER 1</div>
-              <div class="char-swatches" id="charSwatches"></div>
+              <div class="style-swatches" id="startStyleSwatches" data-ui></div>
             </div>
             <button class="char-btn" id="charNextBtn">›</button>
           </div>
-          <div class="power-bar" id="startPowerBar">
-            <div class="power-pip active"></div>
-            <div class="power-pip"></div>
-            <div class="power-pip"></div>
-            <div class="power-pip"></div>
-            <div class="power-pip"></div>
-          </div>
-          <div class="char-help keys-only">← → TO CHOOSE · ↑ ↓ COLORS</div>
+          <div class="char-help keys-only">← → HERO · ↑ ↓ SKIN</div>
         </div>
       </div>
     </div>
@@ -753,8 +873,13 @@
     <div class="death-score" id="deathScoreUI">0</div>
     <div class="new-best hidden" id="newBestUI">NEW BEST!</div>
     <div class="highscore-line" id="deathHiScore"></div>
-    <div id="lbList" style="margin-top:10px;"></div>
-    <button class="menu-btn" onclick="restartGame()">↻ RESTART</button>
+    <div class="death-coins" id="deathCoinsUI"></div>
+    <div id="lbList" style="margin-top:6px;"></div>
+    <div class="death-actions" data-ui>
+      <button class="howto-link" id="deathNewGameBtn">↻ NEW GAME</button>
+      <button class="howto-link shop" id="deathShopBtn">🛒 SHOP</button>
+      <button class="howto-link" id="deathMenuBtn">⌂ MENU</button>
+    </div>
     <div class="cta">PRESS SPACE TO TRY AGAIN</div>
   </div>
 
@@ -774,10 +899,10 @@
       <div class="pause-left">
         <div class="pause-title">PAUSED</div>
         <button class="menu-btn" onclick="resumeGame()">▶ RESUME</button>
-        <button class="menu-btn" onclick="restartGame()">↻ RESTART</button>
+        <button class="menu-btn" onclick="restartLevel()">↻ RESTART LEVEL</button>
         <div class="menu-row">
-          <button class="menu-btn half" onclick="saveGame()">💾 SAVE</button>
-          <button class="menu-btn half" onclick="loadSave()">📂 LOAD</button>
+          <button class="menu-btn half" onclick="openShop()">🛒 SHOP</button>
+          <button class="menu-btn half" onclick="switchPlayer()">⇄ PLAYERS</button>
         </div>
         <button class="menu-btn" onclick="openHowTo(false)">? HOW TO PLAY</button>
         <button class="menu-btn" onclick="toggleEditor()">✏ LEVEL EDITOR</button>
@@ -816,7 +941,7 @@
               <button class="char-btn" id="pauseCharNextBtn">›</button>
             </div>
           </div>
-          <div class="menu-note">Looks update live. Class changes apply next run.</div>
+          <div class="menu-note">Hero changes apply next run · progress saves itself</div>
         </div>
       </div>
     </div>
@@ -836,6 +961,39 @@
         <button class="howto-btn" id="howToNext">NEXT ›</button>
       </div>
       <div class="howto-hint keys-only">← → TO FLIP · ESC TO SKIP</div>
+    </div>
+  </div>
+
+  <!-- Who's playing? (shown when the page opens; each player has their own save, coins and skins) -->
+  <div class="screen hidden" id="profileScreen" data-ui>
+    <div class="screen-title">WHO'S PLAYING?</div>
+    <div class="profile-sub" id="profileSub">PICK YOUR PLAYER — YOUR GAME IS SAVED</div>
+    <div class="profile-list" id="profileList"></div>
+    <div class="profile-new hidden" id="profileNew">
+      <input id="profileNameInput" maxlength="12" placeholder="YOUR NAME" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go">
+      <div class="howto-actions">
+        <button class="howto-btn ghost" id="profileCancel">CANCEL</button>
+        <button class="howto-btn" id="profileCreate">LET'S GO ›</button>
+      </div>
+    </div>
+    <div class="profile-foot"><button class="howto-link" id="profileManage">✎ EDIT PLAYERS</button></div>
+  </div>
+
+  <!-- Shop: spend coins on skins and powers -->
+  <div class="screen hidden" id="shopScreen" data-ui>
+    <div class="shop-head">
+      <button class="howto-link" id="shopBack">‹ BACK</button>
+      <div class="shop-title">SHOP</div>
+      <div class="coin-pill"><i class="coin"></i><span id="shopCoins">0</span></div>
+    </div>
+    <div class="shop-tabs">
+      <button class="shop-tab active" data-tab="skins">🎨 SKINS</button>
+      <button class="shop-tab" data-tab="powers">⚡ POWERS</button>
+    </div>
+    <div class="shop-grid" id="shopGrid"></div>
+    <div class="shop-detail">
+      <div class="sd-text"><div class="sd-name" id="sdName"></div><div class="sd-desc" id="sdDesc"></div></div>
+      <button class="howto-btn sd-btn" id="sdBtn">BUY</button>
     </div>
   </div>
 
@@ -1049,7 +1207,21 @@ const CHARACTER_STYLES = [
   { id:'ocean', name:'Ocean', colors:['#dbeafe','#60a5fa','#2563eb','#0f766e','#67e8f9'], dot:'#60a5fa' },
   { id:'forest', name:'Forest', colors:['#dcfce7','#4ade80','#16a34a','#166534','#bef264'], dot:'#22c55e' },
   { id:'midnight', name:'Midnight', colors:['#cbd5e1','#818cf8','#4f46e5','#312e81','#93c5fd'], dot:'#818cf8' },
+  // ── Shop skins (bought with coins). fx = little trail while you move ──
+  { id:'gold',    name:'Gold Rush', price:120, colors:['#fef9c3','#fde047','#facc15','#eab308','#fef08a'], dot:'#facc15', fx:'sparkle', fxCol:'#fff7c2' },
+  { id:'frost',   name:'Frost',     price:160, colors:['#f0f9ff','#bae6fd','#7dd3fc','#38bdf8','#e0f2fe'], dot:'#7dd3fc', fx:'snow',    fxCol:'#e0f2fe' },
+  { id:'lava',    name:'Lava',      price:200, colors:['#fed7aa','#fb923c','#f97316','#dc2626','#fbbf24'], dot:'#f97316', fx:'ember',   fxCol:'#fb923c' },
+  { id:'toxic',   name:'Toxic',     price:240, colors:['#ecfccb','#a3e635','#84cc16','#4d7c0f','#d9f99d'], dot:'#a3e635', fx:'bubble',  fxCol:'#bef264' },
+  { id:'galaxy',  name:'Galaxy',    price:320, colors:['#e9d5ff','#a855f7','#7e22ce','#3b0764','#f0abfc'], dot:'#a855f7', fx:'stars',   fxCol:'#f5d0fe' },
+  { id:'shadow',  name:'Void',      price:380, colors:['#475569','#334155','#1e293b','#0f172a','#020617'], dot:'#1e293b', fx:'smoke',   fxCol:'#64748b', glow:'#a78bfa' },
+  { id:'rainbow', name:'Rainbow',   price:500, colors:null, rainbow:true, dot:'conic-gradient(#f43f5e,#facc15,#22c55e,#3b82f6,#a855f7,#f43f5e)', fx:'rainbow' },
 ];
+const FREE_SKINS = CHARACTER_STYLES.filter(s => !s.price).map(s => s.id);
+
+// ── Players (profiles) — declared up here because the character UI reads them at boot ──
+let profileStore = { activeId: null, list: [] };
+let profile = null;                 // the player who is playing right now
+function upgradeLevel(id) { return (profile && profile.upgrades && profile.upgrades[id]) || 0; }
 let selectedCharIdx = 0;
 let selectedStyleIdx = 0;
 let charStats = CHARACTERS[0];
@@ -1256,6 +1428,7 @@ function generatePlatforms(startX, count) {
   for (let i = 0; i < count; i++) {
     const w = 90 + Math.random()*130;
     const gap = 55 + Math.random()*85;
+    if (lx + w > LEVEL_LENGTH - 70) break;          // the level ends at the exit — nothing past it
     const dy = (Math.random()-0.5)*85;
     let y = Math.max(H*0.22, Math.min(baseY, ly+dy));
     const moving = Math.random() < 0.18;
@@ -1411,6 +1584,10 @@ function initWorld() {
     }
   }
 
+  // bridge any big hole left before the exit platform
+  const lastGen = platforms.filter(p => p.x < LEVEL_LENGTH - 20).reduce((m, p) => Math.max(m, p.x + p.w), 0);
+  if (LEVEL_LENGTH - 20 - lastGen > 130) platforms.push(makePlatform(lastGen + 60, H - 100, Math.min(120, LEVEL_LENGTH - 100 - lastGen), 14));
+
   // level exit door at LEVEL_LENGTH
   const doorBaseY = H - 60;
   const exitPlatform = makePlatform(LEVEL_LENGTH-20, doorBaseY, 90);
@@ -1420,6 +1597,8 @@ function initWorld() {
   platformEnd = Math.max(platformEnd, LEVEL_LENGTH + 200);
   platforms = platforms.map(normalizePlatform);
   seedItemBoxes();
+  seedCoins();
+  safetyNetUsed = false;
 
   resetPlayer();
   applyPower();
@@ -1596,15 +1775,21 @@ function applyCharacterLoadout(fullHeal=false) {
   const available = getSelectableCharacters();
   charStats = available[selectedCharIdx] || available[0] || CHARACTERS[0];
   charSpeedMult = charStats.speedMult || 1;
-  const nextMax = Math.max(3, 6 + (charStats.hpBonus || 0));
+  const nextMax = Math.max(3, 6 + (charStats.hpBonus || 0)) + upgradeLevel('heart');
   player.maxHp = nextMax;
   player.hp = fullHeal ? nextMax : Math.min(player.hp || nextMax, nextMax);
 }
 
-function getCurrentCharacterColors() {
-  const style = CHARACTER_STYLES[selectedStyleIdx];
-  return style?.colors || charStats.colors || ['#e2e8f0','#a78bfa','#60a5fa','#34d399','#fbbf24'];
+function skinColors(style, character=charStats) {
+  if (style?.rainbow) {
+    const h = (frameCount * 2) % 360;
+    return [0, 1, 2, 3, 4].map(i => `hsl(${(h + i * 18) % 360},85%,${68 - i * 4}%)`);
+  }
+  return style?.colors || character.colors || ['#e2e8f0','#a78bfa','#60a5fa','#34d399','#fbbf24'];
 }
+function getCurrentCharacterColors() { return skinColors(CHARACTER_STYLES[selectedStyleIdx]); }
+function currentSkin() { return CHARACTER_STYLES[selectedStyleIdx] || CHARACTER_STYLES[0]; }
+function ownsSkin(id) { return FREE_SKINS.includes(id) || !!(profile && profile.skins.includes(id)); }
 
 function cycleCharacter(dir) {
   const available = getSelectableCharacters();
@@ -1615,8 +1800,20 @@ function cycleCharacter(dir) {
 }
 
 function cycleCharacterStyle(dir) {
-  selectedStyleIdx = (selectedStyleIdx + dir + CHARACTER_STYLES.length) % CHARACTER_STYLES.length;
+  // only skins this player owns (the rest are in the shop)
+  for (let i = 0; i < CHARACTER_STYLES.length; i++) {
+    selectedStyleIdx = (selectedStyleIdx + dir + CHARACTER_STYLES.length) % CHARACTER_STYLES.length;
+    if (ownsSkin(CHARACTER_STYLES[selectedStyleIdx].id)) break;
+  }
   updateCharacterSelectUI();
+}
+function styleDotsHtml() {
+  const dots = CHARACTER_STYLES.map((style, idx) => ownsSkin(style.id)
+    ? `<button class="style-dot${idx===selectedStyleIdx?' active':''}" data-style-idx="${idx}" title="${style.name}" style="background:${style.dot}"></button>`
+    : '').join('');
+  const more = CHARACTER_STYLES.some(s => !ownsSkin(s.id))
+    ? '<button class="style-dot add" data-shop="skins" title="More skins in the shop">+</button>' : '';
+  return dots + more;
 }
 
 function updateCharacterSelectUI() {
@@ -1628,35 +1825,37 @@ function updateCharacterSelectUI() {
   if (selectedCharIdx >= available.length) selectedCharIdx = 0;
   charStats = available[selectedCharIdx] || CHARACTERS[0];
   const colors = getCurrentCharacterColors();
-  const statsText = `HP ${Math.max(3, 6 + (charStats.hpBonus || 0))} • SPD ${(charStats.speedMult || 1).toFixed(2)}x • START POWER ${charStats.startPower || 1}`;
-  const paletteHtml = colors.map(c => `<span style="background:${c}"></span>`).join('');
+  if (!ownsSkin(currentSkin().id)) selectedStyleIdx = 0;
+  const hp = Math.max(3, 6 + (charStats.hpBonus || 0)) + upgradeLevel('heart');
+  const statsText = `HP ${hp} • SPD ${(charStats.speedMult || 1).toFixed(2)}x • START POWER ${charStats.startPower || 1}`;
   document.getElementById('charClassUI').textContent = charStats.cls;
   document.getElementById('charNameUI').textContent = charStats.name;
   document.getElementById('charDescUI').textContent = charStats.desc;
   document.getElementById('charStatsUI').textContent = statsText;
-  document.getElementById('charSwatches').innerHTML = paletteHtml;
   const pauseClass = document.getElementById('pauseCharClassUI');
   if (pauseClass) {
     pauseClass.textContent = charStats.cls;
     document.getElementById('pauseCharNameUI').textContent = charStats.name;
     document.getElementById('pauseCharDescUI').textContent = charStats.desc;
     document.getElementById('pauseCharStatsUI').textContent = statsText;
-    document.getElementById('pauseCharSwatches').innerHTML = paletteHtml;
-    document.getElementById('styleSwatches').innerHTML = CHARACTER_STYLES.map((style, idx) =>
-      `<button class="style-dot${idx===selectedStyleIdx?' active':''}" data-style-idx="${idx}" title="${style.name}" style="background:${style.dot}"></button>`
-    ).join('');
-    document.querySelectorAll('.style-dot').forEach(btn => {
-      btn.onclick = e => {
-        selectedStyleIdx = Number(e.currentTarget.dataset.styleIdx);
-        updateCharacterSelectUI();
-      };
-    });
+    document.getElementById('pauseCharSwatches').innerHTML = '';
   }
-  [...document.querySelectorAll('#startPowerBar .power-pip')].forEach((el, idx) => {
-    el.classList.toggle('active', idx < (charStats.startPower || 1));
+  // skin dots (start screen + pause menu): only skins you own, plus a "+" that opens the shop
+  ['styleSwatches', 'startStyleSwatches'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = styleDotsHtml();
+  });
+  document.querySelectorAll('.style-dot').forEach(btn => {
+    btn.onclick = e => {
+      e.stopPropagation();
+      if (btn.dataset.shop) { openShop('skins'); return; }
+      selectedStyleIdx = Number(btn.dataset.styleIdx);
+      updateCharacterSelectUI();
+    };
   });
   drawCharacterPreview('charPreview');
   drawCharacterPreview('pauseCharPreview');
+  rememberLook();
 }
 
 function getSelectableCharacters() {
@@ -1745,12 +1944,16 @@ function drawCharacterAccessoriesLocal(drawCtx, character=charStats, bodyCol='#f
   drawCtx.restore();
 }
 
-function drawCharacterPreview(canvasId) {
-  const canvas = document.getElementById(canvasId);
+function selectedCharacter() { return charStats || CHARACTERS[0]; }
+// opts: { char, skin } to draw someone other than the current selection (profile cards, shop)
+function drawCharacterPreview(canvasId, opts = {}) {
+  const canvas = typeof canvasId === 'string' ? document.getElementById(canvasId) : canvasId;
   if (!canvas) return;
   const pctx = canvas.getContext('2d');
   if (!pctx) return;
-  const colors = getCurrentCharacterColors();
+  const charStats = opts.char || selectedCharacter();   // local override for this preview only
+  const skin = opts.skin || currentSkin();
+  const colors = skinColors(skin, charStats);
   const bodyCol = colors[Math.min((charStats.startPower || 1) - 1, 4)];
   const look = getCharacterLook(charStats);
   pctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1764,6 +1967,7 @@ function drawCharacterPreview(canvasId) {
 
   pctx.save();
   pctx.translate(canvas.width / 2, canvas.height / 2 + 4);
+  if (opts.zoom) pctx.scale(opts.zoom, opts.zoom);
   pctx.shadowBlur = 16;
   pctx.shadowColor = look.glow;
   pctx.fillStyle = bodyCol;
@@ -1945,6 +2149,12 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     return;                      // don't let these keys leak into the game/menus
   }
+  if (e.target && e.target.tagName === 'INPUT') {   // typing a name: never start/move the game
+    if (e.target.id === 'nameInput' && e.key === 'Enter') { e.preventDefault(); submitScore(); }
+    return;
+  }
+  if (state === 'profiles') return;
+  if (state === 'shop') { if (e.code === 'Escape' || e.code === 'Backspace') closeShop(); return; }
   keys[e.code] = true;
   if (state === 'start' && !e.metaKey && !e.ctrlKey && !e.altKey) handleArchitectCodeInput(e.key);
   if (state === 'intro' && ['Space','Enter','Escape','KeyZ','KeyX'].includes(e.code)) {
@@ -1952,7 +2162,7 @@ document.addEventListener('keydown', e => {
     trySkipWakeIntro();
     return;
   }
-  if ((e.code==='Space'||e.code==='Enter') && (state==='start'||state==='dead')) startGame();
+  if ((e.code==='Space'||e.code==='Enter') && (state==='start'||state==='dead') && document.getElementById('nameScreen').classList.contains('hidden')) continueGame();
   if (e.code==='Tab') { e.preventDefault(); if (state==='start') toggleCoop(); }
   if (state === 'start') {
     if (e.code === 'ArrowLeft' || e.code === 'KeyQ') cycleCharacter(-1);
@@ -2277,8 +2487,10 @@ document.querySelectorAll('[data-ctl]').forEach(btn => btn.addEventListener('cli
 document.querySelectorAll('.ctl-picker').forEach(el => el.addEventListener('click', e => e.stopPropagation()));
 syncControlUI();
 
-document.getElementById('startScreen').addEventListener('click', ()=>{ if(state==='start') { prepareTouchRun(); startGame(); } });
-document.getElementById('deathScreen').addEventListener('click', ()=>{ if(state==='dead') { prepareTouchRun(); startGame(); } });
+// tap anywhere (except a button) on the start / game-over screen = continue
+const isControl = t => t && t.closest && t.closest('button, input, [data-ui], .char-btn');
+document.getElementById('startScreen').addEventListener('click', e => { if (state==='start' && !isControl(e.target)) { prepareTouchRun(); continueGame(); } });
+document.getElementById('deathScreen').addEventListener('click', e => { if (state==='dead' && !isControl(e.target)) { prepareTouchRun(); continueGame(); } });
 document.querySelector('#startScreen .char-select').addEventListener('click', e => e.stopPropagation());
 document.getElementById('charPrevBtn').addEventListener('click', e => { e.stopPropagation(); cycleCharacter(-1); });
 document.getElementById('charNextBtn').addEventListener('click', e => { e.stopPropagation(); cycleCharacter(1); });
@@ -2324,7 +2536,6 @@ function finishWakeIntro(skipped=false) {
   state = 'play';
   document.getElementById('menuHubBtn').classList.add('show');
   startMusic();
-  if (skipped) showToast('INTRO SKIPPED');
   if (!howToSeen()) openHowTo(true);       // first run: quick, skippable walkthrough
   else afterHowTo();
 }
@@ -2404,8 +2615,15 @@ function howToStep(dir) {
   renderHowTo();
 }
 // Runs once the player is actually in control at the start of a run.
+function showTip(key, data) {
+  // each tip shows once per player, so returning players aren't nagged every run
+  if (profile) { if (profile.tips[key]) return; profile.tips[key] = 1; queuePersist(); }
+  showTutorial(data);
+}
 function afterHowTo() {
-  if (isTouchDevice && (controlMode === 'tap' || controlMode === 'tilt')) {
+  const zoneKey = 'zones-' + controlMode;
+  if (isTouchDevice && (controlMode === 'tap' || controlMode === 'tilt') && !(profile && profile.tips[zoneKey])) {
+    if (profile) { profile.tips[zoneKey] = 1; queuePersist(); }
     const hint = document.getElementById('zoneHint');
     hint.innerHTML = controlMode === 'tap'
       ? '<div class="zone l">◀ HOLD<br>RUN LEFT</div><div class="zone r">HOLD ▶<br>RUN RIGHT</div><div class="mid">DOUBLE-TAP = JUMP · SWIPE = DASH</div>'
@@ -2413,7 +2631,7 @@ function afterHowTo() {
     hint.classList.add('show');
     setTimeout(() => hint.classList.remove('show'), 3000);
   }
-  setTimeout(()=>{ if (state === 'play') showTutorial(wallJumpTut()); }, 2200);
+  setTimeout(()=>{ if (state === 'play') showTip('walljump', wallJumpTut()); }, 3400);   // after the zone hint fades
 }
 document.getElementById('howToNext').addEventListener('click', e => { e.stopPropagation(); howToStep(1); });
 document.getElementById('howToBack').addEventListener('click', e => { e.stopPropagation(); howToStep(-1); });
@@ -2429,24 +2647,68 @@ function trySkipWakeIntro() {
 // ─────────────────────────────────────────────
 //  SCREENS
 // ─────────────────────────────────────────────
+function hideRunScreens() {
+  ['startScreen', 'deathScreen', 'nameScreen', 'pauseScreen', 'shopScreen'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('menuHubBtn').classList.remove('show');
+}
+
+// Brand-new game from Level 1 (wipes this player's saved spot, keeps coins/skins/powers)
 function startGame() {
   audioCtx.resume();
-  document.getElementById('startScreen').classList.add('hidden');
-  document.getElementById('deathScreen').classList.add('hidden');
-  document.getElementById('nameScreen').classList.add('hidden');
-  document.getElementById('pauseScreen').classList.add('hidden');
-  document.getElementById('menuHubBtn').classList.remove('show');
-  currentLevel = 1; inHiddenLevel = false; score = 0; powerLevel = charStats.startPower || 1;
+  hideRunScreens();
+  currentLevel = 1; inHiddenLevel = false; score = 0;
+  powerLevel = Math.max(charStats.startPower || 1, hasUpgrade('headstart') ? 2 : 1);
   helperUnlocked = false; helperBot = null;
+  runCoins = 0;
   initWorld();
+  markLevelStart();
   startWakeIntro();
 }
 
+// Pick up where this player left off (level + checkpoint). No saved spot → new game.
+function continueGame() {
+  const pr = profile && profile.progress;
+  if (!pr) { startGame(); return; }
+  audioCtx.resume();
+  hideRunScreens();
+  currentLevel = Math.max(1, Math.min(5, pr.level | 0 || 1));
+  inHiddenLevel = false;
+  score = Math.max(0, pr.score | 0);
+  powerLevel = Math.max(1, Math.min(5, pr.power | 0 || 1), charStats.startPower || 1, hasUpgrade('headstart') ? 2 : 1);
+  helperUnlocked = !!pr.helper; helperBot = null;
+  runCoins = 0;
+  initWorld();
+  if (pr.cp != null && checkpoints[pr.cp]) {
+    const cp = checkpoints[pr.cp];
+    cp.active = true; activeCheckpoint = cp;
+    completeGoal('checkpoint');
+    tryRespawnPlayer();
+  }
+  if (pr.hp > 0) player.hp = Math.min(player.maxHp, pr.hp);
+  updateHPBar();
+  state = 'play';
+  document.getElementById('menuHubBtn').classList.add('show');
+  startMusic();
+  showToast(`WELCOME BACK ${profile.name} · LEVEL ${currentLevel}${activeCheckpoint ? ' · CHECKPOINT' : ''}`);
+  saveProgress();
+}
+
+// Pause menu: replay the current level from its start
+function restartLevel() {
+  if (profile && profile.progress) {
+    const pr = profile.progress;
+    if (!inHiddenLevel) Object.assign(pr, { level: currentLevel });
+    Object.assign(pr, { score: pr.levelScore || 0, power: pr.levelPower || pr.power, cp: null, hp: 0 });
+    continueGame();
+  } else startGame();
+}
+
 function restartGame() {
-  startGame();
+  continueGame();
 }
 
 function quitToMenu() {
+  saveProgress();
   stopMusic();
   audioCtx.suspend();
   state = 'start';
@@ -2459,9 +2721,12 @@ function quitToMenu() {
   document.getElementById('menuHubBtn').classList.remove('show');
   updateStartHiScore();
   updateCharacterSelectUI();
+  refreshStartScreen();
 }
 
 function pauseGame() {
+  if (state !== 'play') return;
+  saveProgress();
   state = 'paused';
   clearAllInput();
   audioCtx.suspend();
@@ -2478,27 +2743,11 @@ function resumeGame() {
   document.getElementById('pauseScreen').classList.add('hidden');
 }
 
-function saveGame() {
-  const save = { score, powerLevel, currentLevel, hp: player.hp, inHiddenLevel };
-  localStorage.setItem('awakened_save', JSON.stringify(save));
-  showToast('GAME SAVED!');
-}
-
-function loadSave() {
-  const raw = localStorage.getItem('awakened_save');
-  if (!raw) { showToast('NO SAVE FOUND'); return; }
-  const save = JSON.parse(raw);
-  score = save.score || 0;
-  powerLevel = save.powerLevel || 1;
-  currentLevel = save.currentLevel || 1;
-  inHiddenLevel = save.inHiddenLevel || false;
-  initWorld();
-  player.hp = Math.min(save.hp || 6, player.maxHp);
-  applyPower();
-  state = 'play';
-  document.getElementById('pauseScreen').classList.add('hidden');
-  document.getElementById('startScreen').classList.add('hidden');
-  showToast('GAME LOADED!');
+function addToLeaderboard(name) {
+  leaderboard.push({ name, score, level: currentLevel, date: new Date().toLocaleDateString() });
+  leaderboard.sort((a,b)=>b.score-a.score);
+  leaderboard = leaderboard.slice(0,10);
+  try { localStorage.setItem('awakened_lb', JSON.stringify(leaderboard)); } catch (_) {}
 }
 
 function submitScore() {
@@ -2521,8 +2770,10 @@ function showDeathFinal() {
   const titleEl = document.querySelector('#deathScreen .screen-title');
   const ctaEl = document.querySelector('#deathScreen .cta');
   if (titleEl) titleEl.textContent = 'YOU LOST';
-  if (ctaEl) ctaEl.textContent = ctaText('TRY AGAIN');
+  const lvl = profile && profile.progress ? profile.progress.level : currentLevel;
+  if (ctaEl) ctaEl.textContent = ctaText(`TRY LEVEL ${lvl} AGAIN`);
   document.getElementById('newBestUI').textContent = 'NEW BEST!';
+  showRunCoins();
   const isNew = score > 0 && leaderboard.length > 0 && leaderboard[0].score === score;
   document.getElementById('deathScoreUI').textContent = score;
   document.getElementById('newBestUI').classList.toggle('hidden', !isNew);
@@ -2541,6 +2792,16 @@ function showVictoryFinal() {
   const ctaEl = document.querySelector('#deathScreen .cta');
   if (titleEl) titleEl.textContent = 'YOU ASCENDED';
   if (ctaEl) ctaEl.textContent = ctaText('RUN AGAIN');
+  if (profile) {
+    addCoins(COIN_VALUES.victory);
+    if (score > (profile.best || 0)) profile.best = score;
+    profile.progress = null;          // the run is finished — next time starts fresh
+    profile.wins = (profile.wins || 0) + 1;
+    persistProfiles();
+    addToLeaderboard(profile.name);
+  }
+  showRunCoins();
+  document.getElementById('lbList').innerHTML = '';
   document.getElementById('deathScoreUI').textContent = score;
   document.getElementById('newBestUI').classList.remove('hidden');
   document.getElementById('newBestUI').textContent = 'RUN COMPLETE!';
@@ -2556,7 +2817,20 @@ function showDeath() {
   document.getElementById('menuHubBtn').classList.remove('show');
   const isNewBest = score > highScore;
   if (isNewBest) { highScore = score; localStorage.setItem('awakened_hs', highScore); }
-  if (isNewBest && score > 0) {
+  if (profile) {
+    // game over: this player's save goes back to the start of the level they were on
+    const pr = profile.progress || {};
+    profile.progress = {
+      ...pr,
+      level: inHiddenLevel && savedStateBeforeHidden ? savedStateBeforeHidden.currentLevel : currentLevel,
+      score: pr.levelScore || 0, power: pr.levelPower || 1, cp: null, hp: 0, at: Date.now(),
+    };
+    if (score > (profile.best || 0)) profile.best = score;
+    persistProfiles();
+    // we already know who's playing, so the score goes on the board under their name
+    if (score > 0) addToLeaderboard(profile.name);
+    showDeathFinal();
+  } else if (isNewBest && score > 0) {
     // Only ask for name if they beat the high score
     const nameTitleEl = document.querySelector('#nameScreen .screen-title');
     if (nameTitleEl) nameTitleEl.textContent = 'YOU LOST';
@@ -2585,6 +2859,500 @@ function updateStartHiScore() {
 }
 updateStartHiScore();
 updateCharacterSelectUI();
+
+// ─────────────────────────────────────────────
+//  PLAYERS, SAVED PROGRESS, COINS & SHOP
+//  Each player (up to 4 per device) has their own save in localStorage:
+//  where they are in the world (level + checkpoint), coins, skins and shop powers.
+// ─────────────────────────────────────────────
+const PROFILE_KEY = 'awakened_players_v1';
+const MAX_PROFILES = 4;
+// how many coins things are worth (tweak to make the shop faster/slower)
+const COIN_VALUES = { pickup: 1, enemy: 2, boss: 25, levelBase: 10, levelPer: 5, voidExit: 30, victory: 100 };
+// shop powers — bought once, active in every run for that player
+const UPGRADES = [
+  { id:'heart',     icon:'❤️', name:'EXTRA HEART', desc:'+1 max heart every run',               prices:[150, 350] },
+  { id:'magnet',    icon:'🧲', name:'COIN MAGNET', desc:'Nearby coins fly to you',               prices:[180] },
+  { id:'wings',     icon:'🍩', name:'LONG WINGS',  desc:'Donut wings last 8 seconds (not 5)',    prices:[220] },
+  { id:'headstart', icon:'👊', name:'HEAD START',  desc:'Every run starts with Punch unlocked',  prices:[260] },
+  { id:'net',       icon:'🛟', name:'SAFETY NET',  desc:'Once per level, a fall costs no heart', prices:[300] },
+  { id:'lucky',     icon:'🍀', name:'LUCKY COINS', desc:'Enemies drop double coins',             prices:[360] },
+];
+let coins = [];                 // coins in the world this level
+let runCoins = 0;               // picked up this run (shown on the game-over screen)
+let safetyNetUsed = false;
+
+function hasUpgrade(id) { return upgradeLevel(id) > 0; }
+function flyDuration() { return hasUpgrade('wings') ? 480 : FLY_DURATION; }
+
+function loadProfileStore() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+    if (raw && Array.isArray(raw.list)) profileStore = raw;
+  } catch (_) {}
+  profileStore.list.forEach(p => {
+    p.skins = Array.isArray(p.skins) ? p.skins : [];
+    p.upgrades = p.upgrades || {};
+    p.tips = p.tips || {};
+    p.coins = Math.max(0, p.coins | 0);
+  });
+}
+function persistProfiles() {
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profileStore)); } catch (_) {}
+}
+let persistTimer = null;
+function queuePersist() {
+  if (persistTimer) return;
+  persistTimer = setTimeout(() => { persistTimer = null; persistProfiles(); }, 600);
+}
+function makeProfile(name) {
+  const p = {
+    id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    name, coins: 0, earned: 0, charId: 'nobody', skinId: 'default',
+    skins: [], upgrades: {}, progress: null, best: 0, tips: {}, created: Date.now(),
+  };
+  // first player on this device inherits the old single save + best score
+  if (!profileStore.list.length) {
+    try {
+      const old = JSON.parse(localStorage.getItem('awakened_save') || 'null');
+      if (old && old.currentLevel) p.progress = { level: old.currentLevel, score: old.score || 0, power: old.powerLevel || 1, cp: null, hp: 0, levelScore: old.score || 0, levelPower: old.powerLevel || 1 };
+    } catch (_) {}
+    p.best = highScore || 0;
+  }
+  return p;
+}
+
+// remember the hero + skin a player picked
+function rememberLook() {
+  if (!profile) return;
+  const ch = charStats && charStats.id, sk = currentSkin().id;
+  if (profile.charId !== ch || profile.skinId !== sk) { profile.charId = ch; profile.skinId = sk; queuePersist(); }
+}
+
+function selectProfile(id) {
+  const p = profileStore.list.find(x => x.id === id);
+  if (!p) return;
+  profile = p;
+  profileStore.activeId = id;
+  persistProfiles();
+  const chars = getSelectableCharacters();
+  selectedCharIdx = Math.max(0, chars.findIndex(c => c.id === p.charId));
+  selectedStyleIdx = Math.max(0, CHARACTER_STYLES.findIndex(s => s.id === p.skinId));
+  if (!ownsSkin(CHARACTER_STYLES[selectedStyleIdx].id)) selectedStyleIdx = 0;
+  updateCharacterSelectUI();
+  closeProfileScreen();
+}
+
+// ── Saved progress ──
+// level start: remember the score/power you arrive with (game over sends you back here)
+function markLevelStart(keepLevelBase = false) {
+  if (!profile || inHiddenLevel) return;
+  const pr = profile.progress || {};
+  const sameLevel = keepLevelBase && pr.level === currentLevel;
+  profile.progress = {
+    level: currentLevel, score, power: powerLevel, cp: null, hp: player.hp, helper: helperUnlocked,
+    levelScore: sameLevel ? (pr.levelScore ?? score) : score,
+    levelPower: sameLevel ? (pr.levelPower ?? powerLevel) : powerLevel,
+    at: Date.now(),
+  };
+  persistProfiles();
+}
+// mid-level save (checkpoints, pause, leaving the page, every ~10 s)
+function saveProgress() {
+  if (!profile || !profile.progress) return;
+  if (!['play', 'paused'].includes(state) || player.hp <= 0 || waterDeathPending || levelTransition > 0) return;
+  const pr = profile.progress;
+  if (inHiddenLevel) {
+    // secret areas aren't saved — you come back to the level you found it in
+    if (savedStateBeforeHidden) Object.assign(pr, { level: savedStateBeforeHidden.currentLevel, score: savedStateBeforeHidden.score, power: savedStateBeforeHidden.powerLevel, hp: savedStateBeforeHidden.hp, cp: null });
+  } else {
+    Object.assign(pr, {
+      level: currentLevel, score, power: powerLevel, hp: player.hp, helper: helperUnlocked,
+      cp: activeCheckpoint ? checkpoints.indexOf(activeCheckpoint) : null,
+    });
+  }
+  pr.at = Date.now();
+  persistProfiles();
+}
+window.addEventListener('pagehide', () => { saveProgress(); persistProfiles(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { saveProgress(); persistProfiles(); } });
+
+// ── Coins ──
+function addCoins(n) {
+  if (!n) return;
+  runCoins += n;
+  if (profile) { profile.coins += n; profile.earned = (profile.earned || 0) + n; queuePersist(); }
+  updateCoinHUD(true);
+}
+function updateCoinHUD(bump) {
+  document.getElementById('coinUI').textContent = profile ? profile.coins : runCoins;
+  if (bump) {
+    const el = document.getElementById('coinStat');
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  }
+}
+function showRunCoins() {
+  document.getElementById('deathCoinsUI').innerHTML = runCoins > 0
+    ? `+${runCoins} <i class="coin"></i> THIS RUN${profile ? ` · ${profile.coins} TOTAL` : ''}` : '';
+}
+function playCoinSound() { playNote(1320, 1760, 0.07, 'square', 0.035); }
+
+// coin rows over platforms + arcs over gaps (placed after the level is built)
+function seedCoins() {
+  coins = [];
+  const plats = platforms
+    .filter(p => p.x >= 420 && p.x < LEVEL_LENGTH - 120 && !p.prepSpot && p.y > 60)
+    .sort((a, b) => a.x - b.x);
+  const rowChance = inHiddenLevel ? 0.7 : 0.6, arcChance = inHiddenLevel ? 0.6 : 0.5;
+  const boxes = itemBoxes.map(b => ({ x: b.x, y: b.y }));
+  for (let i = 0; i < plats.length; i++) {
+    const p = plats[i];
+    if (p.type !== 'moving' && p.w >= 80 && Math.random() < rowChance) {
+      const n = Math.max(2, Math.min(5, Math.floor(p.w / 34)));
+      const span = p.w * 0.6, x0 = p.x + p.w * 0.2;
+      const y = p.y - 50;
+      if (!boxes.some(b => Math.abs(b.x - (p.x + p.w / 2)) < p.w / 2 + 10 && Math.abs(b.y - y) < 30)) {
+        for (let k = 0; k < n; k++) coins.push({ x: x0 + (n === 1 ? span / 2 : span * k / (n - 1)) - 6, y, collected: false });
+      }
+    }
+    const q = plats[i + 1];
+    if (q && p.type !== 'moving' && q.type !== 'moving') {
+      const gap = q.x - (p.x + p.w);
+      if (gap > 40 && gap < 170 && Math.random() < arcChance) {
+        const sx = p.x + p.w - 6, ex = q.x + 6, top = Math.min(p.y, q.y) - 70;
+        for (let k = 1; k <= 3; k++) {
+          const t = k / 4;
+          const bx = sx + (ex - sx) * t;
+          const by = (1 - t) * (1 - t) * (p.y - 30) + 2 * (1 - t) * t * top + t * t * (q.y - 30);
+          coins.push({ x: bx - 6, y: by - 6, collected: false });
+        }
+      }
+    }
+  }
+}
+// defeated enemies pop out a couple of coins that bounce onto the ground
+function dropCoins(x, y, n) {
+  for (let i = 0; i < n; i++) {
+    coins.push({ x: x - 6, y: y - 6, vx: (Math.random() - 0.5) * 3, vy: -3 - Math.random() * 2.5, dropped: true, life: 600, collected: false });
+  }
+}
+function collectCoinsFor(pl) {
+  if (!pl || pl.dead) return;
+  const magnet = pl === player && hasUpgrade('magnet');
+  const cx = pl.x + PW / 2, cy = pl.y + PH / 2;
+  for (const c of coins) {
+    if (c.collected) continue;
+    if (magnet) {
+      const dx = cx - (c.x + 6), dy = cy - (c.y + 6), d = Math.hypot(dx, dy);
+      if (d < 110 && d > 1) { const pull = 5.5 * (1 - d / 140); c.x += dx / d * pull; c.y += dy / d * pull; c.pulled = true; }
+    }
+    if (pl.x + PW > c.x && pl.x < c.x + 12 && pl.y + PH > c.y && pl.y < c.y + 12) {
+      c.collected = true;
+      addCoins(COIN_VALUES.pickup);
+      particles.push({ x: c.x + 6, y: c.y + 6, vx: 0, vy: -1.2, color: '#fde68a', life: 14, maxLife: 14, alpha: 1, r: 2 });
+      playCoinSound();
+    }
+  }
+}
+function updateCoins() {
+  for (const c of coins) {
+    if (c.collected || !c.dropped || c.pulled) continue;
+    c.life--;
+    if (c.life <= 0) { c.collected = true; continue; }
+    c.vy = Math.min(c.vy + 0.35, 7);
+    const ny = c.y + c.vy;
+    c.x += c.vx; c.vx *= 0.98;
+    let landed = false;
+    if (c.vy > 0) {
+      for (const p of platforms) {
+        if (c.x + 12 > p.x && c.x < p.x + p.w && c.y + 12 <= p.y + 2 && ny + 12 >= p.y) {
+          c.y = p.y - 12; c.vy = Math.abs(c.vy) > 2 ? -c.vy * 0.35 : 0; c.vx *= 0.7; landed = true; break;
+        }
+      }
+    }
+    if (!landed) c.y = ny;
+    if (c.y > H + 40) c.collected = true;
+  }
+  collectCoinsFor(player);
+  if (coopMode && player2) collectCoinsFor(player2);
+  if (frameCount % 120 === 0) coins = coins.filter(c => !c.collected);
+}
+function drawCoins() {
+  for (const c of coins) {
+    if (c.collected) continue;
+    const sx = c.x - scrollX;
+    if (sx < -14 || sx > W + 14) continue;
+    if (c.dropped && c.life < 120 && Math.floor(c.life / 6) % 2) continue;   // blink before vanishing
+    const spin = Math.cos(frameCount * 0.09 + c.x * 0.05);
+    const w = Math.max(1.2, 6 * Math.abs(spin));
+    const bob = c.dropped ? 0 : Math.sin(frameCount * 0.07 + c.x * 0.03) * 1.5;
+    const cx = sx + 6, cy = c.y + 6 + bob;
+    ctx.fillStyle = '#b45309';
+    ctx.beginPath(); ctx.ellipse(cx, cy + 0.8, w, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = spin > 0 ? '#fbbf24' : '#f59e0b';
+    ctx.beginPath(); ctx.ellipse(cx, cy, w, 6, 0, 0, Math.PI * 2); ctx.fill();
+    if (w > 3) {
+      ctx.fillStyle = '#fde68a';
+      ctx.fillRect(cx - w * 0.25, cy - 3, Math.max(1, w * 0.3), 6);
+    }
+  }
+}
+
+// skins with a trail leave a few particles behind while you move
+function updateSkinTrail(pl) {
+  const skin = currentSkin();
+  if (!skin.fx || !pl || pl.dead) return;
+  const moving = Math.abs(pl.vx) > 0.6 || !pl.onGround;
+  if (!moving || frameCount % 4) return;
+  const x = pl.x + PW / 2 - pl.facing * 8 + (Math.random() - 0.5) * 8, y = pl.y + PH * (0.35 + Math.random() * 0.5);
+  const base = { x, y, life: 22, maxLife: 22, alpha: 1, r: 2 };
+  const fx = {
+    sparkle: { vx: 0, vy: -0.4, color: Math.random() < 0.5 ? '#fff' : skin.fxCol },
+    snow:    { vx: (Math.random() - 0.5) * 0.6, vy: 0.2, color: skin.fxCol, r: 1.6 },
+    ember:   { vx: (Math.random() - 0.5) * 0.8, vy: -1.4, color: Math.random() < 0.5 ? '#fbbf24' : skin.fxCol },
+    bubble:  { vx: 0, vy: -0.8, color: skin.fxCol, r: 2.4 },
+    stars:   { vx: 0, vy: -0.2, color: Math.random() < 0.4 ? '#fff' : skin.fxCol, r: 1.5 },
+    smoke:   { vx: -pl.facing * 0.4, vy: -0.5, color: skin.fxCol, r: 3 },
+    rainbow: { vx: 0, vy: -0.2, color: `hsl(${(frameCount * 6) % 360},90%,65%)` },
+  }[skin.fx];
+  if (fx) particles.push({ ...base, ...fx, noGravity: true });
+}
+
+// ── Who's playing? screen ──
+function playerSummary(p) {
+  const pr = p.progress;
+  return `${pr ? 'LVL ' + pr.level : 'NEW'} · <i class="coin"></i> ${p.coins}`;
+}
+function renderProfiles() {
+  const list = document.getElementById('profileList');
+  const managing = document.getElementById('profileScreen').classList.contains('managing');
+  list.innerHTML = profileStore.list.map(p =>
+    `<button class="profile-card" data-id="${p.id}"><span class="pc-del" data-del="${p.id}">✕</span>` +
+    `<canvas width="96" height="96"></canvas><div class="pc-name"></div><div class="pc-meta">${playerSummary(p)}</div></button>`
+  ).join('') + (profileStore.list.length < MAX_PROFILES && !managing
+    ? '<button class="profile-card add" id="profileAdd"><div class="plus">＋</div><div class="pc-name">NEW</div><div class="pc-meta">PLAYER</div></button>' : '');
+  list.querySelectorAll('.profile-card[data-id]').forEach(card => {
+    const p = profileStore.list.find(x => x.id === card.dataset.id);
+    card.querySelector('.pc-name').textContent = p.name;           // textContent: names are typed by players
+    drawCharacterPreview(card.querySelector('canvas'), {
+      char: CHARACTERS.find(c => c.id === p.charId) || CHARACTERS[0],
+      skin: CHARACTER_STYLES.find(s => s.id === p.skinId) || CHARACTER_STYLES[0], zoom: 1.7,
+    });
+    card.onclick = e => {
+      e.stopPropagation();
+      if (!document.getElementById('profileScreen').classList.contains('managing')) { selectProfile(p.id); return; }
+      if (card.classList.contains('confirm-del')) {
+        profileStore.list = profileStore.list.filter(x => x.id !== p.id);
+        if (profileStore.activeId === p.id) profileStore.activeId = null;
+        if (profile && profile.id === p.id) profile = null;
+        persistProfiles();
+        if (!profileStore.list.length) document.getElementById('profileScreen').classList.remove('managing');
+        renderProfiles();
+      } else {
+        list.querySelectorAll('.confirm-del').forEach(c => { c.classList.remove('confirm-del'); });
+        card.classList.add('confirm-del');
+        card.querySelector('.pc-meta').textContent = 'TAP AGAIN TO DELETE';
+      }
+    };
+  });
+  const add = document.getElementById('profileAdd');
+  if (add) add.onclick = e => { e.stopPropagation(); showNewProfileForm(true); };
+  document.getElementById('profileManage').style.visibility = profileStore.list.length ? 'visible' : 'hidden';
+  document.getElementById('profileManage').textContent = managing ? '✓ DONE' : '✎ EDIT PLAYERS';
+  document.getElementById('profileSub').textContent = managing ? 'TAP A PLAYER TO DELETE THEM'
+    : profileStore.list.length ? 'PICK YOUR PLAYER — YOUR GAME IS SAVED' : 'MAKE A PLAYER — YOUR PROGRESS, COINS AND SKINS SAVE TO IT';
+}
+function showNewProfileForm(show) {
+  document.getElementById('profileNew').classList.toggle('hidden', !show);
+  document.getElementById('profileList').classList.toggle('hidden', show);
+  document.querySelector('.profile-foot').style.display = show ? 'none' : '';
+  const input = document.getElementById('profileNameInput');
+  document.getElementById('profileCancel').style.display = profileStore.list.length ? '' : 'none';
+  if (show) { input.value = ''; setTimeout(() => input.focus(), 30); }
+  else input.blur();
+}
+function createProfileFromForm() {
+  const input = document.getElementById('profileNameInput');
+  const name = input.value.replace(/[^\p{L}\p{N} _.\-]/gu, '').trim().toUpperCase().slice(0, 12);
+  if (!name) { input.focus(); input.classList.add('shake'); return; }
+  if (profileStore.list.length >= MAX_PROFILES) return;
+  const p = makeProfile(name);
+  profileStore.list.push(p);
+  persistProfiles();
+  input.blur();
+  selectProfile(p.id);
+}
+function openProfileScreen() {
+  state = 'profiles';
+  stopMusic();
+  const scr = document.getElementById('profileScreen');
+  scr.classList.remove('hidden', 'managing');
+  document.getElementById('startScreen').classList.remove('hidden');
+  showNewProfileForm(!profileStore.list.length);
+  renderProfiles();
+}
+function closeProfileScreen() {
+  document.getElementById('profileScreen').classList.add('hidden');
+  showNewProfileForm(false);
+  state = 'start';
+  refreshStartScreen();
+}
+function switchPlayer() {
+  saveProgress();
+  persistProfiles();
+  quitToMenu();
+  openProfileScreen();
+}
+document.getElementById('profileManage').addEventListener('click', e => {
+  e.stopPropagation();
+  document.getElementById('profileScreen').classList.toggle('managing');
+  renderProfiles();
+});
+document.getElementById('profileCreate').addEventListener('click', e => { e.stopPropagation(); createProfileFromForm(); });
+document.getElementById('profileCancel').addEventListener('click', e => { e.stopPropagation(); showNewProfileForm(false); });
+document.getElementById('profileNameInput').addEventListener('keydown', e => {
+  e.stopPropagation();                       // typing a name must never move/jump/start the game
+  if (e.key === 'Enter') { e.preventDefault(); createProfileFromForm(); }
+  if (e.key === 'Escape' && profileStore.list.length) showNewProfileForm(false);
+});
+document.getElementById('playerChip').addEventListener('click', e => { e.stopPropagation(); openProfileScreen(); });
+
+// ── Start screen: continue / new game ──
+let newGameArmed = 0;
+function refreshStartScreen() {
+  const pr = profile && profile.progress;
+  document.getElementById('startCta').textContent = pr ? ctaText(`CONTINUE · LEVEL ${pr.level}`) : ctaText('BEGIN');
+  const ng = document.getElementById('newGameBtn');
+  ng.style.display = pr ? '' : 'none';
+  ng.classList.remove('confirm'); ng.textContent = '↻ NEW GAME'; newGameArmed = 0;
+  document.getElementById('playerChip').style.display = profile ? '' : 'none';
+  if (profile) {
+    document.getElementById('chipName').textContent = profile.name;
+    document.getElementById('chipCoins').textContent = profile.coins;
+    drawCharacterPreview('chipAvatar', { zoom: 1.9 });
+  }
+  updateCoinHUD(false);
+  const best = profile ? profile.best : highScore;
+  const el = document.getElementById('startHiScore');
+  el.innerHTML = best > 0 ? `${profile ? 'YOUR BEST' : 'BEST'}: <span>${best}</span>` : '';
+}
+function newGameFromMenu(btn) {
+  // starting over wipes the saved level — ask for a second tap first
+  if (profile && profile.progress && !newGameArmed) {
+    newGameArmed = setTimeout(() => { newGameArmed = 0; btn.classList.remove('confirm'); btn.textContent = '↻ NEW GAME'; }, 2600);
+    btn.classList.add('confirm'); btn.textContent = 'TAP AGAIN: START OVER?';
+    return;
+  }
+  clearTimeout(newGameArmed); newGameArmed = 0;
+  prepareTouchRun();
+  startGame();
+}
+document.getElementById('newGameBtn').addEventListener('click', e => { e.stopPropagation(); newGameFromMenu(e.currentTarget); });
+document.getElementById('deathNewGameBtn').addEventListener('click', e => { e.stopPropagation(); newGameFromMenu(e.currentTarget); });
+document.getElementById('deathMenuBtn').addEventListener('click', e => { e.stopPropagation(); quitToMenu(); });
+document.getElementById('startShopBtn').addEventListener('click', e => { e.stopPropagation(); openShop(); });
+document.getElementById('deathShopBtn').addEventListener('click', e => { e.stopPropagation(); openShop(); });
+
+// ── Shop ──
+let shopTab = 'skins', shopSel = null, shopReturnState = 'start';
+function openShop(tab) {
+  if (!profile) { openProfileScreen(); return; }
+  if (tab) shopTab = tab;
+  shopSel = null;
+  shopReturnState = state;
+  if (state === 'play') { pauseGame(); shopReturnState = 'paused'; }
+  confettiPieces = [];
+  state = 'shop';
+  document.getElementById('shopScreen').classList.remove('hidden');
+  renderShop();
+}
+function closeShop() {
+  document.getElementById('shopScreen').classList.add('hidden');
+  state = shopReturnState;
+  updateCharacterSelectUI();
+  refreshStartScreen();
+  if (state === 'paused') updateHPBar();
+}
+function shopItems() {
+  return shopTab === 'skins'
+    ? CHARACTER_STYLES.map(s => ({ kind: 'skin', id: s.id, name: s.name.toUpperCase(), skin: s, price: s.price || 0,
+        owned: ownsSkin(s.id), equipped: currentSkin().id === s.id,
+        desc: s.fx ? `${s.price ? '' : 'Free · '}leaves a ${s.fx} trail` : 'Free color style' }))
+    : UPGRADES.map(u => {
+        const lvl = upgradeLevel(u.id), max = u.prices.length;
+        return { kind: 'power', id: u.id, name: u.name, icon: u.icon, desc: u.desc, lvl, max,
+          price: lvl < max ? u.prices[lvl] : 0, owned: lvl >= max, partial: lvl > 0 && lvl < max };
+      });
+}
+function renderShop() {
+  document.getElementById('shopCoins').textContent = profile.coins;
+  document.querySelectorAll('.shop-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === shopTab));
+  const grid = document.getElementById('shopGrid');
+  grid.classList.toggle('powers', shopTab === 'powers');
+  const items = shopItems();
+  if (!shopSel || !items.some(i => i.id === shopSel)) shopSel = (items.find(i => i.equipped) || items.find(i => !i.owned) || items[0]).id;
+  grid.innerHTML = items.map(it => {
+    const price = it.equipped ? '<span class="si-price equipped">WEARING</span>'
+      : it.owned ? `<span class="si-price owned">${it.kind === 'power' ? '✓ ACTIVE' : '✓ OWNED'}</span>`
+      : `<span class="si-price"><i class="coin"></i>${it.price}</span>`;
+    const pips = it.kind === 'power' && it.max > 1
+      ? `<span class="si-pips">${Array.from({ length: it.max }, (_, i) => `<b class="${i < it.lvl ? 'on' : ''}"></b>`).join('')}</span>` : '';
+    const art = it.kind === 'skin' ? '<canvas width="96" height="96"></canvas>' : `<div class="si-icon">${it.icon}</div>`;
+    const desc = it.kind === 'power' ? `<div class="si-desc">${it.desc}</div>` : '';
+    const cls = ['shop-item', it.id === shopSel ? 'selected' : '', it.owned ? 'owned' : 'locked', profile.coins >= it.price ? 'affordable' : ''].join(' ');
+    return `<button class="${cls}" data-id="${it.id}">${art}<div class="si-name">${it.name}</div>${desc}${pips}${price}</button>`;
+  }).join('');
+  grid.querySelectorAll('.shop-item').forEach((el, i) => {
+    const it = items[i];
+    if (it.kind === 'skin') drawCharacterPreview(el.querySelector('canvas'), { skin: it.skin, zoom: 1.8 });
+    el.onclick = e => { e.stopPropagation(); shopSel = it.id; renderShop(); };
+  });
+  // detail bar + the one action button (buying takes a deliberate second tap: select, then BUY)
+  const it = items.find(i => i.id === shopSel);
+  document.getElementById('sdName').textContent = it.name;
+  const btn = document.getElementById('sdBtn');
+  btn.classList.remove('done'); btn.disabled = false;
+  if (it.kind === 'skin') {
+    document.getElementById('sdDesc').textContent = it.desc;
+    if (it.equipped) { btn.textContent = '✓ WEARING'; btn.classList.add('done'); btn.disabled = true; }
+    else if (it.owned) btn.textContent = 'WEAR IT';
+    else btn.innerHTML = `BUY <i class="coin"></i> ${it.price}`;
+  } else {
+    document.getElementById('sdDesc').textContent = it.max > 1 ? `${it.desc} · level ${it.lvl}/${it.max}` : it.desc;
+    if (it.owned) { btn.textContent = '✓ ACTIVE'; btn.classList.add('done'); btn.disabled = true; }
+    else btn.innerHTML = `${it.partial ? 'UPGRADE' : 'BUY'} <i class="coin"></i> ${it.price}`;
+  }
+  if (!it.owned && profile.coins < it.price) { btn.disabled = true; btn.innerHTML = `NEED <i class="coin"></i> ${it.price - profile.coins} MORE`; }
+}
+function shopAction() {
+  const it = shopItems().find(i => i.id === shopSel);
+  if (!it || !profile) return;
+  if (it.kind === 'skin') {
+    if (!it.owned) {
+      if (profile.coins < it.price) return;
+      profile.coins -= it.price;
+      profile.skins.push(it.id);
+      playLevelCompleteSound();
+    }
+    selectedStyleIdx = CHARACTER_STYLES.findIndex(s => s.id === it.id);
+    rememberLook();
+  } else {
+    if (it.owned || profile.coins < it.price) return;
+    profile.coins -= it.price;
+    profile.upgrades[it.id] = it.lvl + 1;
+    playLevelCompleteSound();
+    if (it.id === 'heart' && (shopReturnState === 'paused')) { player.maxHp += 1; player.hp += 1; }
+  }
+  persistProfiles();
+  updateCoinHUD(false);
+  renderShop();
+}
+document.getElementById('sdBtn').addEventListener('click', e => { e.stopPropagation(); shopAction(); });
+document.getElementById('shopBack').addEventListener('click', e => { e.stopPropagation(); closeShop(); });
+document.querySelectorAll('.shop-tab').forEach(t => t.addEventListener('click', e => { e.stopPropagation(); shopTab = t.dataset.tab; shopSel = null; renderShop(); }));
+
+// boot: pick up the player list; the "who's playing?" screen opens once loading finishes
+loadProfileStore();
 
 // ─────────────────────────────────────────────
 //  UNLOCK TOAST
@@ -2969,6 +3737,7 @@ function update() {
         showToast('FIND THE END OF THE VOID');
         stopMusic(); startMusic();
         initWorld();
+        saveProgress();
       } else if (levelTransitionTo === 99) {
         inHiddenLevel = false;
         if (savedStateBeforeHidden) {
@@ -2983,11 +3752,13 @@ function update() {
         stopMusic(); startMusic();
         initWorld();
         if (savedStateBeforeHidden) player.hp = Math.min(savedStateBeforeHidden.hp, player.maxHp);
+        markLevelStart(true);
       } else {
         currentLevel = levelTransitionTo;
         inHiddenLevel = false;
         stopMusic(); startMusic();
         initWorld();
+        markLevelStart();
       }
       state = 'play';
     }
@@ -3034,10 +3805,14 @@ function update() {
     powerLevel = np; applyPower();
     const msgs = ['','PUNCH UNLOCKED!','DASH + RANGED SHOTS!','WALL CLIMB UNLOCKED!','BURST ATTACK READY!'];
     showToast(msgs[powerLevel-1]||'POWER UP!');
-    if (TUTORIALS[powerLevel]) showTutorial(TUTORIALS[powerLevel]());
+    if (TUTORIALS[powerLevel]) showTip('power' + powerLevel, TUTORIALS[powerLevel]());
   }
 
   if (invincibleTimer>0) invincibleTimer--;
+
+  updateCoins();
+  updateSkinTrail(player);
+  if (frameCount % 600 === 0) saveProgress();     // quiet autosave every ~10 s
 
   // moving platforms
   platforms.forEach(p => {
@@ -3226,10 +4001,15 @@ function update() {
     idleFaceTimer = 90;
   }
 
+  // end wall: the exit platform is the end of the level (you used to be able to run on past it)
+  const endWall = LEVEL_LENGTH + 70 - PW;
+  if (player.x > endWall) { player.x = endWall; if (player.vx > 0) player.vx = 0; }
+
   // scroll
   const sx = player.x - scrollX;
   if (sx > W*0.58) scrollX += (sx-W*0.58)*0.16;
   if (sx < W*0.28) scrollX -= (W*0.28-sx)*0.16;
+  scrollX = Math.min(scrollX, LEVEL_LENGTH + 170 - W);   // don't pan out into empty sky past the exit
 
   // generate more world
   while (platformEnd-scrollX < W*2.5) platformEnd = generatePlatforms(platformEnd+60, 10);
@@ -3350,9 +4130,9 @@ function update() {
       f.collected = true; score += 15;
       incrementGoal('fruit');
       if (f.type === 'donut') {
-        player.flyTimer = FLY_DURATION;
+        player.flyTimer = flyDuration();
         spawnParticles(f.x + 7, f.y + 7, '#f472b6', 12);
-        showToast('DONUT WINGS! 5 SECONDS');
+        showToast(`DONUT WINGS! ${Math.round(flyDuration() / 60)} SECONDS`);
         playNote(740, 988, 0.18, 'triangle', 0.12);
       } else if (f.type === 'power_orb') {
         powerLevel = Math.min(5, powerLevel + 1);
@@ -3401,7 +4181,8 @@ function update() {
       activeCheckpoint = cp;
       completeGoal('checkpoint');
       spawnParticles(cp.x + 8, cp.y + 14, '#fde68a', 16);
-      showToast('CHECKPOINT SET');
+      showToast('CHECKPOINT SET · GAME SAVED');
+      saveProgress();
     }
   });
 
@@ -3423,6 +4204,7 @@ function update() {
       playLevelCompleteSound();
       const bonus = 200 + currentLevel * 50;
       score += bonus;
+      addCoins(inHiddenLevel ? COIN_VALUES.voidExit : COIN_VALUES.levelBase + COIN_VALUES.levelPer * currentLevel);
       if (inHiddenLevel) hiddenExitSuccess = true;
       if (!inHiddenLevel && currentLevel >= 5) {
         state = 'dead';
@@ -3430,7 +4212,7 @@ function update() {
         if (score > highScore) { highScore = score; localStorage.setItem('awakened_hs', highScore); }
         showVictoryFinal();
       } else {
-        showToast('LEVEL CLEAR! +' + bonus);
+        showToast('LEVEL CLEAR! +' + bonus + ' · COINS BANKED');
         const nextDest = inHiddenLevel ? 99 : currentLevel + 1;
         nextLevelOrHidden(nextDest);
       }
@@ -3501,7 +4283,7 @@ function update() {
           f.collected = true; score += 15;
           incrementGoal('fruit');
           if (f.type === 'donut') {
-            player2.flyTimer = FLY_DURATION;
+            player2.flyTimer = flyDuration();
             spawnParticles(f.x+7, f.y+7, '#f472b6', 10);
             playNote(740, 988, 0.18, 'triangle', 0.12);
           } else if (f.type === 'power_orb') {
@@ -3571,7 +4353,7 @@ function update() {
   updateHPBar();
 
   // particles
-  particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; p.vy+=0.1; p.life--; p.alpha=p.life/p.maxLife; });
+  particles.forEach(p => { p.x+=p.vx; p.y+=p.vy; if (!p.noGravity) p.vy+=0.1; p.life--; p.alpha=p.life/p.maxLife; });
   particles = particles.filter(p=>p.life>0);
 
   // heart popups
@@ -3595,9 +4377,10 @@ function rememberSafeGround() {
   if (player.onGround && p && p.type === 'solid' && !inHiddenLevel) lastSafeGround = { plat: p, x: player.x };
 }
 function respawnAfterFall() {
-  player.hp -= 1;
-  heartPopups.push({ idx: Math.max(0, player.hp), x: player.x + PW/2, y: H - 40, vy: -3, life: 40, maxLife: 40 });
-  playHurtSound(); hapticPulse(40);
+  const netSave = hasUpgrade('net') && !safetyNetUsed && player.hp > 0;
+  if (netSave) safetyNetUsed = true;
+  else player.hp -= 1;
+  if (!netSave) { heartPopups.push({ idx: Math.max(0, player.hp), x: player.x + PW/2, y: H - 40, vy: -3, life: 40, maxLife: 40 }); playHurtSound(); hapticPulse(40); }
   updateHPBar();
   if (player.hp <= 0) { if (!tryRespawnPlayer()) showDeath(); return; }
   const safe = lastSafeGround && platforms.includes(lastSafeGround.plat) ? lastSafeGround : null;
@@ -3610,8 +4393,8 @@ function respawnAfterFall() {
   player.flyTimer = 0;
   invincibleTimer = 100;
   scrollX = Math.max(0, player.x - W * 0.35);
-  spawnParticles(player.x + PW/2, player.y + PH/2, '#fde68a', 14);
-  showToast('OOPS! −1 ♥');
+  spawnParticles(player.x + PW/2, player.y + PH/2, netSave ? '#60a5fa' : '#fde68a', 14);
+  showToast(netSave ? 'SAFETY NET! NO HEART LOST' : 'OOPS! −1 ♥');
 }
 
 let prevHp = 6;
@@ -3643,7 +4426,7 @@ function wingsWoreOff(pl, isP1) {
 // or an arrow at the top edge if a jump pad flings you above the screen.
 function drawFlightAndOffscreen(pl, px, py) {
   if (pl.flyTimer > 0) {
-    const t = pl.flyTimer / FLY_DURATION;
+    const t = Math.min(1, pl.flyTimer / flyDuration());
     if (!(pl.flyTimer < 60 && Math.floor(pl.flyTimer / 6) % 2 === 0)) {
       const bw = 26, bx = px + PW/2 - bw/2, by = Math.max(2, py - 12);
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -3733,6 +4516,7 @@ function killPlayer() { if (!tryRespawnPlayer()) showDeath(); }
 function killEnemy(e) {
   e.dead=true; score += 25+powerLevel*8;
   incrementGoal('enemy');
+  dropCoins(e.x + e.w/2, e.y, COIN_VALUES.enemy * (hasUpgrade('lucky') ? 2 : 1));
   spawnParticles(e.x+e.w/2, e.y+e.h/2, '#fbbf24', 14);
   playBlehSound();
 }
@@ -3917,6 +4701,7 @@ function killBoss() {
   completeGoal('boss');
   const reward = 500 + currentLevel * 100;
   score += reward;
+  dropCoins(boss.x + boss.w/2, boss.y + boss.h/2, COIN_VALUES.boss);
   showToast('★ BOSS DEFEATED! +' + reward);
   spawnParticles(boss.x+boss.w/2, boss.y+boss.h/2, '#ffd700', 50);
   spawnParticles(boss.x+boss.w/2, boss.y+boss.h/2, '#ef4444', 25);
@@ -5198,7 +5983,7 @@ function drawHeartPopups() {
 function drawParticles() {
   particles.forEach(p => {
     ctx.globalAlpha=p.alpha; ctx.fillStyle=p.color;
-    ctx.beginPath(); ctx.arc(p.x - scrollX,p.y,3,0,Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x - scrollX,p.y,p.r||3,0,Math.PI*2); ctx.fill();
   });
   ctx.globalAlpha=1;
 }
@@ -5329,6 +6114,7 @@ function draw() {
   drawHiddenTrigger();
   drawHealthPacks();
   drawFruits();
+  drawCoins();
   drawAllGroundShadows();
   drawEnemies(b);
   drawProjectiles();
@@ -5766,6 +6552,7 @@ wrapper.addEventListener('contextmenu', e => {
       setTimeout(() => {
         screen.classList.add('fade-out');
         setTimeout(() => screen.style.display = 'none', 650);
+        openProfileScreen();                       // "who's playing?" every time the game opens
       }, 220);
     }
   }, 60);
@@ -5833,7 +6620,11 @@ function loop(now = performance.now()) {
   // On 60 Hz screens draw the latest state as-is (no added lag); on faster screens blend.
   const highRefresh = avgFrameMs < 13;
   withInterpolation(highRefresh ? stepAccumulator / STEP_MS : 1, draw);
-  if (state !== lastUiState) { document.body.classList.toggle('playing', state === 'play'); lastUiState = state; }
+  if (state !== lastUiState) {
+    document.body.classList.toggle('playing', state === 'play');
+    document.body.classList.toggle('at-menu', state === 'start' || state === 'profiles');
+    lastUiState = state;
+  }
   const canAtk = !!(player.canPunch || player.canShoot || player.canBurst), canDash = !!player.canDash;
   if (canAtk !== lastCanAtk || canDash !== lastCanDash) {
     document.body.classList.toggle('can-attack', canAtk); document.body.classList.toggle('can-dash', canDash);

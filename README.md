@@ -6,6 +6,20 @@ A side-scrolling action platformer where you start as nobody and slowly become s
 
 Open `index.html` in any browser — no build step required. Live at [awakened-three.vercel.app](https://awakened-three.vercel.app).
 
+### Who's playing?
+
+When the game opens it asks **WHO'S PLAYING?** Tap your player, or tap **＋ NEW** and type a name (up to 4 players per device). Each player has their own:
+
+- **Saved spot in the world.** The game saves itself at every checkpoint, at the start of every level, when you pause, and when you leave the page. Next time, the start screen says **TAP TO CONTINUE · LEVEL 3** and drops you back at your last checkpoint.
+- **Coins, skins and shop powers.**
+- **Best score and tips.** Tips only show the first time, not every run.
+
+Out of hearts with no checkpoint? You go back to the **start of the level you were on**, not Level 1. **↻ NEW GAME** starts over from Level 1 (it asks you to tap twice so you don't wipe your spot by accident). Coins, skins and powers are never lost.
+
+Switch players with the name chip in the top-left of the start screen, or **MENU → ⇄ PLAYERS**. To delete a player: **✎ EDIT PLAYERS**, then tap them twice.
+
+> Saves live in this browser on this device (localStorage). Clearing site data clears them.
+
 ### First time playing?
 
 The first time you start a run, a short **How To Play** walkthrough appears (4 quick cards: Move → Jump → Get Stronger → Your Goal). It shows the controls for whatever you're playing on — keyboard, tap, tilt or buttons.
@@ -60,11 +74,50 @@ Pick a control style on the start screen (or any time from **MENU → CONTROLS**
 - **Kill enemies** — defeat them for big score bonuses
 - **Clear levels** — level-complete bonuses stack with your run
 
+## Coins & the shop
+
+Spinning gold coins sit above platforms and in arcs over gaps. You also earn coins when you:
+
+| How | Coins |
+|-----|-------|
+| Pick up a coin | 1 |
+| Defeat an enemy (coins pop out — grab them) | 2 |
+| Defeat a boss | 25 |
+| Clear a level | 10 + 5 × level |
+| Escape a secret void | 30 |
+| Finish the whole run | 100 |
+
+Spend them in the **🛒 SHOP** (start screen, pause menu, or game-over screen). Pick an item, then press **BUY**.
+
+**Skins** (5 free + 7 to buy). Shop skins leave a trail while you move. Change skins with the dots under your hero (keyboard ↑ ↓).
+
+| Skin | Price | Trail |
+|------|-------|-------|
+| Gold Rush | 120 | sparkles |
+| Frost | 160 | snow |
+| Lava | 200 | embers |
+| Toxic | 240 | bubbles |
+| Galaxy | 320 | stars |
+| Void | 380 | smoke |
+| Rainbow | 500 | color-shifting body |
+
+**Powers** stay on for every run once bought:
+
+| Power | Price | What it does |
+|-------|-------|--------------|
+| Extra Heart | 150, then 350 | +1 max heart (buy twice for +2) |
+| Coin Magnet | 180 | nearby coins fly to you |
+| Long Wings | 220 | donut wings last 8 s instead of 5 |
+| Head Start | 260 | every run starts with Punch |
+| Safety Net | 300 | once per level, a fall costs no heart |
+| Lucky Coins | 360 | enemies drop double coins |
+
 ## Hearts, falling & checkpoints
 
 - Getting hit costs a heart. Hearts refill with health packs.
 - **Falling off the map or into the river costs one heart** and puts you back on the last solid ground you stood on.
-- Out of hearts? You restart at your last **checkpoint** with full hearts. With no checkpoint yet, it's game over.
+- Out of hearts? You restart at your last **checkpoint** with full hearts. With no checkpoint yet, it's game over and you retry that level from its start.
+- The exit is the end of the level. There's nothing to find past it.
 
 ## Power Progression
 
@@ -99,6 +152,8 @@ Hidden void stages can branch off from the main path. These secret levels are ti
 
 ## Current Features
 
+- **Players & auto-save** — "who's playing?" picker; each player continues where they left off
+- **Coins & shop** — earn coins in the world, buy skins (with trails) and permanent powers
 - **Character select with preview** — choose a hero before the run, with live preview art and appearance styles
 - **Distinct hero looks** — same core body shape, but each character has their own visual identity
 - **Accessible in-run menu** — persistent menu button, pause hub, restart flow, and character bay
@@ -184,6 +239,8 @@ Your game will be live at `https://awakened-[hash].vercel.app`.
 - [x] Tap / tilt / button phone controls, landscape prompt, first-run walkthrough
 - [x] Full-screen, full-resolution rendering with smooth motion on 120 Hz screens
 - [x] Fixed-timestep game loop (consistent speed on 60/120/144 Hz screens)
+- [x] Player profiles with auto-save (level + checkpoint), coins, skin + power shop
+- [ ] Cloud saves (play the same player on phone and computer)
 
 ---
 
@@ -193,4 +250,5 @@ Your game will be live at `https://awakened-[hash].vercel.app`.
 - **Screen size:** the world is always `H = 420` units tall; `W` changes with the screen shape (560–924). Always use `W`/`H` (never hard-code 700) when drawing across the screen. Menus/HUD live in `#ui`, laid out at 420px tall and scaled by `fitGame()` — design them to fit 420 tall and they'll never need scrolling.
 - **Input:** read movement with `moveAxis()` (−1…1, analog on tilt/stick) and buttons with `isUp()` / `isAtk()` / `isDash()`. They already merge keyboard, on-screen buttons, tilt and touch zones.
 - **Control labels:** use `ctl('jump')`, `ctl('attack')`, etc. in any tutorial text so it says the right thing for keyboard vs. phone.
+- **Players / saves:** everything is in `localStorage['awakened_players_v1']`. Call `markLevelStart()` when a new level begins and `saveProgress()` for a mid-level save. Coin values are in `COIN_VALUES`, shop powers in `UPGRADES`, and skins are the entries in `CHARACTER_STYLES` that have a `price`. Use `hasUpgrade('magnet')` and similar to check a power.
 - **Testing tilt on a laptop:** Chrome DevTools → ⋮ → More tools → **Sensors** lets you fake device orientation; use device mode (phone emulation) so the touch controls turn on.
